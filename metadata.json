@@ -1,0 +1,6 @@
+{
+  "name": "99 Ride Analyzer & GigU Code Generator",
+  "description": "Simulador interativo e gerador de código Kotlin para análise automática de corridas da 99 (estilo GigU) usando serviço de acessibilidade.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

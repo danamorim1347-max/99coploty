@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">99 Ride Analyzer (GigU Clone)</string>
+    <string name="accessibility_service_label">99 Ride Analyzer - Assistente de Ganhos</string>
+    <string name="accessibility_service_desc">Lê automaticamente as informações de corridas da tela do app da 99 para calcular o ganho por km e por hora em tempo real, sem automação de cliques.</string>
+    
+    <!-- Main Activity -->
+    <string name="title_permissions">Permissões Necessárias</string>
+    <string name="desc_permissions">Para o app funcionar, você precisa conceder duas permissões cruciais:</string>
+    <string name="btn_acc_permission">Ativar Acessibilidade</string>
+    <string name="btn_overlay_permission">Permitir Janela Flutuante</string>
+    <string name="status_label">Status do Serviço:</string>
+    <string name="status_disabled">INATIVO</string>
+    <string name="status_enabled">ATIVO (Monitorando 99)</string>
+    
+    <string name="overlay_toggle_title">Exibir Semáforo Flutuante</string>
+    <string name="overlay_toggle_desc">Mostra um balão flutuante na tela ao receber chamadas de corrida</string>
+    
+    <string name="btn_open_settings">Configurações de Ganhos</string>
+    <string name="instructions_title">Como usar:</string>
+    <string name="instructions_text">1. Ative a permissão de Acessibilidade e de Janela Flutuante acima.\n2. Defina os seus valores mínimos aceitáveis no botão de Configurações.\n3. Abra o aplicativo da 99 para Motoristas.\n4. Ao receber uma oferta de corrida, um balão flutuante indicará se a viagem é Verde 🟢 (Excelente), Amarela 🟡 (Aceitável) ou Vermelha 🔴 (Ruim) com base em seus objetivos!</string>
+
+    <!-- Settings Activity -->
+    <string name="title_settings">Configurar Metas de Corrida</string>
+    <string name="group_rates">Valores por Quilômetro (R$/km)</string>
+    <string name="lbl_km_good">Mínimo para Corrida Excelente (🟢 Verde):</string>
+    <string name="lbl_km_medium">Mínimo para Corrida Aceitável (🟡 Amarela):</string>
+    <string name="group_hours">Valores por Hora (R$/h)</string>
+    <string name="lbl_hour_good">Faturamento por hora desejado (Mínimo):</string>
+    <string name="btn_save_settings">Salvar Configurações</string>
+    <string name="toast_settings_saved">Configurações salvas com sucesso!</string>
+    <string name="lbl_vibration">Vibrar ao receber nova corrida</string>
+</resources>

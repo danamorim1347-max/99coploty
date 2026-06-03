@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/overlay_card"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardUseCompatPadding="true"
+    android:foreground="?android:attr/selectableItemBackground">
+
+    <LinearLayout
+        android:id="@+id/overlay_container"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="#E0F2F1"> <!-- Cor inicial neutra, mudada programaticamente -->
+
+        <TextView
+            android:id="@+id/tv_semaphore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:text="🟢"
+            android:textSize="32sp"
+            android:layout_marginEnd="12dp"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_ride_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R$ 15,80"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#111111"/>
+
+            <TextView
+                android:id="@+id/tv_ride_dist_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="4.2 km • 12 min"
+                android:textSize="12sp"
+                android:textColor="#555555"
+                android:layout_marginTop="2dp"/>
+
+            <TextView
+                android:id="@+id/tv_rate_km"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R$ 3,76 / km"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#333333"
+                android:layout_marginTop="4dp"/>
+
+            <TextView
+                android:id="@+id/tv_rate_hour"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R$ 79,00 / hora"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#333333"/>
+        </LinearLayout>
+        
+        <ImageView
+            android:id="@+id/btn_close_overlay"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="top|end"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:contentDescription="Fechar"
+            android:alpha="0.6"/>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
