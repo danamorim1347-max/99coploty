@@ -3,24 +3,30 @@ package com.gigu.clone99
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.gigu.clone99.databinding.ActivityMainBinding
 
 /**
- * Tela principal do app GigU Clone.
- * Fornece interface amigável para ativar permissões, configurar metas de ganhos
- * e exibir o status do serviço.
+ * Tela principal do app 99 Copilot.
+ * Fornece interface amigável para ativar permissões, configurar metas de ganhos,
+ * e exibir métricas unificadas do dashboard local de corridas monitoradas.
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,11 +34,25 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupListeners()
+        requestNotificationPermission()
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    101
+                )
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updateServiceStatus()
+        loadDashboardStats()
     }
 
     private fun setupListeners() {
@@ -40,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnAccessibilityPerm.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
-            Toast.makeText(this, "Encontre '${getString(R.string.accessibility_service_label)}' e ative-o.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Encontre '99 Copilot' na lista de serviços e ative-o.", Toast.LENGTH_LONG).show()
         }
 
         // Redireciona para permissão de sobreposição de app (Overlay / Mostrar sobre outros apps)
@@ -77,6 +97,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Carrega de forma assíncrona as estatísticas locais do Room Database para popular o Dashboard UI.
+     */
+    private fun loadDashboardStats() {
+        Thread {
+            try {
+                val dao = RideDatabase.getDatabase(this).rideDao()
+                val totalNetProfit = dao.getTotalNetProfit()
+                val avgGainPerKm = dao.getAverageGainPerKm()
+                val accepted = dao.getAcceptedCount()
+                val refused = dao.getRefusedCount()
+                val bestRegStat = dao.getBestRegion()
+                val bestRegionText = bestRegStat?.region ?: "Nenhuma"
+
+                mainHandler.post {
+                    try {
+                        binding.tvDashNetProfit.text = String.format("R$ %.2f", totalNetProfit)
+                        binding.tvDashAvgKm.text = if (avgGainPerKm > 0) String.format("R$ %.2f/km", avgGainPerKm) else "R$ 0,00/km"
+                        binding.tvDashCounts.text = "$accepted aceitas • $refused rec"
+                        binding.tvDashBestRegion.text = bestRegionText
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+            }
+        }.start()
+    }
+
+    /**
      * Verifica e atualiza o estado de ativação do AccessibilityService e Overlay na tela.
      */
     private fun updateServiceStatus() {
@@ -84,10 +134,10 @@ class MainActivity : AppCompatActivity() {
         val hasOverlayPermission = Settings.canDrawOverlays(this)
 
         if (isServiceRunning && hasOverlayPermission) {
-            binding.tvServiceStatus.text = getString(R.string.status_enabled)
+            binding.tvServiceStatus.text = "ATIVO (99 Copilot Operacional 🚦)"
             binding.tvServiceStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark))
         } else {
-            var statusStr = getString(R.string.status_disabled)
+            var statusStr = "INATIVO"
             if (!isServiceRunning) statusStr += "\n• Falta ativar Acessibilidade"
             if (!hasOverlayPermission) statusStr += "\n• Falta permissão de Janela Flutuante"
             

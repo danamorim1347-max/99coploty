@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>99 Copiloto Pro - Analisador de Corridas</title>
+    <style>
+        :root {
+            --bg-primary: #0a0b10;
+            --bg-surface: #141622;
+            --bg-surface-hover: #1e2032;
+            --bg-input: #1b1d2e;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            
+            --brand-yellow: #facc15;
+            --brand-yellow-glowing: rgba(250, 204, 21, 0.25);
+            
+            --color-green: #10b981;
+            --color-green-glow: rgba(16, 185, 129, 0.15);
+            --color-yellow: #f59e0b;
+            --color-yellow-glow: rgba(245, 158, 11, 0.15);
+            --color-red: #ef4444;
+            --color-red-glow: rgba(239, 68, 68, 0.15);
+            
+            --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            padding-bottom: calc(75px + var(--safe-area-bottom));
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(180deg, rgba(20, 22, 34, 0.95) 0%, rgba(10, 11, 16, 0.95) 100%);
+            border-b: 1px solid var(--border-color);
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-badge {
+            background-color: var(--brand-yellow);
+            color: #000;
+            font-weight: 900;
+            font-size: 14px;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(250, 204, 21, 0.3);
+        }
+
+        .header-info h1 {
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.2;
+            color: #fff;
+        }
+
+        .header-info p {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .status-pill {
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--color-green);
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Container Principal */
+        main {
+            padding: 16px;
+            flex: 1;
+            max-width: 500px;
+            width: 100%;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* Abas (Tab Views) */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards Gerais */
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Inputs Form */
+        .input-group-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .input-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-box label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-field-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-prefix {
+            position: absolute;
+            left: 14px;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--text-muted);
+        }
+
+        .input-field {
+            width: 100%;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 14px;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s ease-in-out;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .input-field:focus {
+            border-color: var(--brand-yellow);
+            box-shadow: 0 0 10px var(--brand-yellow-glowing);
+            background-color: rgba(27, 29, 46, 0.8);
+        }
+
+        .input-field-wrapper .input-field {
+            padding-left: 38px;
+        }
+
+        /* Buttons layout with easy one handed access */
+        .btn-wrapper {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            border: none;
+            outline: none;
+            padding: 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--brand-yellow) 0%, #eab308 100%);
+            color: #000;
+            box-shadow: 0 6px 15px rgba(250, 204, 21, 0.25);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+            box-shadow: 0 2px 5px rgba(250, 204, 21, 0.2);
+        }
+
+        .btn-secondary {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:active {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: scale(0.97);
+        }
+
+        /* Resultado Semaphore UI */
+        .result-card {
+            display: none; /* Show dynamically */
+            border-radius: 24px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 16px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .result-card.active {
+            display: block;
+            animation: modalPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.9) translateY(15px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        .result-card.type-green {
+            background: linear-gradient(140deg, #093a2b 0%, #111827 80%);
+            border: 2px solid var(--color-green);
+            box-shadow: 0 15px 35px var(--color-green-glow);
+        }
+
+        .result-card.type-yellow {
+            background: linear-gradient(140deg, #3d2d0b 0%, #111827 80%);
+            border: 2px solid var(--color-yellow);
+            box-shadow: 0 15px 35px var(--color-yellow-glow);
+        }
+
+        .result-card.type-red {
+            background: linear-gradient(140deg, #3f1118 0%, #111827 80%);
+            border: 2px solid var(--color-red);
+            box-shadow: 0 15px 35px var(--color-red-glow);
+        }
+
+        .result-emoji {
+            font-size: 60px;
+            line-height: 1;
+            margin-bottom: 8px;
+            display: inline-block;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+            animation: tingle 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes tingle {
+            from { transform: scale(1); }
+            to { transform: scale(1.08); }
+        }
+
+        .result-recommendation {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .result-card.type-green .result-recommendation { color: var(--color-green); }
+        .result-card.type-yellow .result-recommendation { color: var(--color-yellow); }
+        .result-card.type-red .result-recommendation { color: var(--color-red); }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .result-stat-box {
+            background-color: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .result-stat-lbl {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .result-stat-val {
+            font-size: 16px;
+            font-weight: 900;
+            color: #fff;
+        }
+
+        .result-explanation {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 14px;
+            font-weight: 500;
+        }
+
+        /* Sliders / Configurações */
+        .config-box {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slider-lbl {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .slider-val {
+            font-size: 15px;
+            font-weight: 900;
+            font-family: monospace;
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .slider-val.green { color: var(--color-green); }
+        .slider-val.yellow { color: var(--color-yellow); }
+
+        .custom-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #25283d;
+            outline: none;
+            transition: background 0.3s;
+        }
+
+        .custom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--brand-yellow);
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transition: transform 0.1s;
+        }
+
+        .custom-slider::-webkit-slider-thumb:active {
+            transform: scale(1.18);
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0 4px;
+            border-t: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .control-row label {
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .switch-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-round {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #2c2f48;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider-round:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider-round {
+            background-color: var(--brand-yellow);
+        }
+
+        input:checked + .slider-round:before {
+            transform: translateX(20px);
+            background-color: #000;
+        }
+
+        /* Histórico UI */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 380px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .history-list::-webkit-scrollbar-thumb {
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .history-item {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s ease;
+        }
+
+        .history-item:active {
+            transform: scale(0.99);
+        }
+
+        .history-item-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .history-metrics {
+            font-size: 13px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .history-meta {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .history-calculated {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--brand-yellow);
+        }
+
+        .badge {
+            font-size: 10px;
+            font-weight: 850;
+            padding: 6px 10px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .badge-green {
+            background-color: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--color-green);
+        }
+
+        .badge-yellow {
+            background-color: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--color-yellow);
+        }
+
+        .badge-red {
+            background-color: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--color-red);
+        }
+
+        .empty-history {
+            text-align: center;
+            padding: 40px 10px;
+            color: var(--text-muted);
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .empty-history span {
+            font-size: 40px;
+        }
+
+        /* Ambient Toast Message */
+        .toast-container {
+            position: fixed;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%) translateY(30px);
+            opacity: 0;
+            background-color: var(--bg-surface);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 12px 24px;
+            border-radius: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            z-index: 1000;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            width: max-content;
+            max-width: 90%;
+        }
+
+        .toast-container.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast-icon {
+            font-size: 16px;
+        }
+
+        .toast-text {
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        /* Bottom Fixed Navigation Bar (Easy for one finger) */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(16, 17, 26, 0.95) 0%, rgba(5, 5, 8, 0.98) 100%);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 12px calc(10px + var(--safe-area-bottom));
+            z-index: 99;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+
+        .nav-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px 10px;
+            border-radius: 12px;
+            flex: 1;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab.active {
+            color: var(--brand-yellow);
+            transform: scale(1.05);
+        }
+
+        .nav-tab svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .nav-tab.active svg {
+            opacity: 1;
+        }
+
+        .nav-tab-label {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-title">
+            <div class="logo-badge">99</div>
+            <div class="header-info">
+                <h1>99 Copiloto Pro</h1>
+                <p>Análise Automatizada de Corridas</p>
+            </div>
+        </div>
+        <div class="status-pill">● COPILOTO pronto</div>
+    </header>
+
+    <!-- Main -->
+    <main>
+        
+        <!-- TELE DO ANALISADOR (TAB 1) -->
+        <div id="tab-analise" class="tab-content active">
+            
+            <!-- Result Semaphore Box (Visible when analyzed) -->
+            <div id="resultBox" class="result-card">
+                <span id="resEmoji" class="result-emoji">🟢</span>
+                <h2 id="resRecommendation" class="result-recommendation">ACEITAR</h2>
+                
+                <div class="result-grid">
+                    <div class="result-stat-box">
+                        <span class="result-stat-lbl">Ganhos por Km</span>
+                        <span id="resValPerKm" class="result-stat-val">R$ 0,00</span>
+                    </div>
+                    <div class="result-stat-box">
+                        <span class="result-stat-lbl">Ganhos por Hora</span>
+                        <span id="resValPerHour" class="result-stat-val">R$ 0,00</span>
+                    </div>
+                </div>
+                <p id="resExplanation" class="result-explanation">A corrida supera seu objetivo definido.</p>
+            </div>
+
+            <!-- Calculadora Input Card -->
+            <div class="card">
+                <div class="card-title">
+                    <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    Inserir Dados da Corrida
+                </div>
+
+                <div class="input-box" style="margin-bottom: 16px;">
+                    <label for="inputValor">Valor Estimado da Corrida</label>
+                    <div class="input-field-wrapper">
+                        <span class="input-prefix">R$</span>
+                        <input type="text" id="inputValor" class="input-field" placeholder="0,00" inputmode="decimal">
+                    </div>
+                </div>
+
+                <div class="input-group-row">
+                    <div class="input-box">
+                        <label for="inputDistance">Distância Total (km)</label>
+                        <div class="input-field-wrapper">
+                            <span class="input-prefix" style="left:12px;">📍</span>
+                            <input type="text" id="inputDistance" class="input-field" placeholder="0,0" inputmode="decimal">
+                        </div>
+                    </div>
+                    <div class="input-box">
+                        <label for="inputTime">Tempo Estimado (min)</label>
+                        <div class="input-field-wrapper">
+                            <span class="input-prefix" style="left:12px;">⏱️</span>
+                            <input type="text" id="inputTime" class="input-field" placeholder="0" inputmode="numeric">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-wrapper">
+                    <button id="btnAnalisar" class="btn btn-primary">
+                        <svg style="width:16px;height:16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Analisar Corrida
+                    </button>
+                    <button id="btnLimpar" class="btn btn-secondary">Limpar</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TELA DO CONFIGURAÇÕES (TAB 2) -->
+        <div id="tab-configuracoes" class="tab-content">
+            <div class="card">
+                <div class="card-title">
+                    <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M20 7h-9M14 17H5M5 7h2M19 17h2M19 12h-5M3 12h8"></path>
+                        <circle cx="17" cy="12" r="3"></circle>
+                        <circle cx="9" cy="7" r="3"></circle>
+                        <circle cx="11" cy="17" r="3"></circle>
+                    </svg>
+                    Metas de Aceitação
+                </div>
+
+                <div class="config-box">
+                    
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span class="slider-lbl">🟢 Corrida Executiva (BOA)</span>
+                            <span id="sliderValGood" class="slider-val green">R$ 2.20/km</span>
+                        </div>
+                        <input type="range" id="sliderGood" class="custom-slider" min="1.0" max="5.0" step="0.1" value="2.2">
+                    </div>
+
+                    <div class="slider-item">
+                        <div class="slider-header">
+                            <span class="slider-lbl">🟡 Corrida Aceitável (MÉDIA)</span>
+                            <span id="sliderValMedium" class="slider-val yellow">R$ 1.50/km</span>
+                        </div>
+                        <input type="range" id="sliderMedium" class="custom-slider" min="0.5" max="3.0" step="0.1" value="1.5">
+                    </div>
+
+                    <div class="control-row">
+                        <label for="vibrarSwitch">Vibrar Dispositivo na Análise</label>
+                        <span class="switch-toggle">
+                            <input type="checkbox" id="vibrarSwitch" checked>
+                            <span class="slider-round"></span>
+                        </span>
+                    </div>
+
+                    <button id="btnResetConfig" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                        Restaurar Valores Padrão
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TELA DO HISTÓRICO (TAB 3) -->
+        <div id="tab-historico" class="tab-content">
+            <div class="card">
+                <div class="card-title" style="justify-content: space-between; margin-bottom: 12px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Últimas 10 Análises
+                    </div>
+                    <button id="btnLimparHistorico" class="btn btn-secondary" style="padding: 6px 12px; font-size: 10px; border-radius: 8px;">Limpar Tudo</button>
+                </div>
+
+                <div id="historyContainer" class="history-list">
+                    <!-- Dynamic rendering -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast" class="toast-container">
+        <span id="toastIcon" class="toast-icon">⚡</span>
+        <span id="toastText" class="toast-text">Cálculo efetuado com sucesso!</span>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <nav>
+        <button id="navBtnAnalise" class="nav-tab active">
+            <svg viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H5v-2h4V7h2v4h4v2z"/>
+            </svg>
+            <span class="nav-tab-label">Análise</span>
+        </button>
+        <button id="navBtnHistorico" class="nav-tab">
+            <svg viewBox="0 0 24 24">
+                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8h-1.5z"/>
+            </svg>
+            <span class="nav-tab-label">Histórico</span>
+        </button>
+        <button id="navBtnConfig" class="nav-tab">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+            <span class="nav-tab-label">Metas</span>
+        </button>
+    </nav>
+
+    <!-- JavaScript logic -->
+    <script>
+        // State variables
+        let minGood = 2.20;
+        let minMedium = 1.50;
+        let vibrateEnabled = true;
+        let history = [];
+
+        // DOM elements
+        const inputValor = document.getElementById('inputValor');
+        const inputDistance = document.getElementById('inputDistance');
+        const inputTime = document.getElementById('inputTime');
+        const btnAnalisar = document.getElementById('btnAnalisar');
+        const btnLimpar = document.getElementById('btnLimpar');
+
+        const resultBox = document.getElementById('resultBox');
+        const resEmoji = document.getElementById('resEmoji');
+        const resRecommendation = document.getElementById('resRecommendation');
+        const resValPerKm = document.getElementById('resValPerKm');
+        const resValPerHour = document.getElementById('resValPerHour');
+        const resExplanation = document.getElementById('resExplanation');
+
+        const sliderGood = document.getElementById('sliderGood');
+        const sliderMedium = document.getElementById('sliderMedium');
+        const sliderValGood = document.getElementById('sliderValGood');
+        const sliderValMedium = document.getElementById('sliderValMedium');
+        const vibrarSwitch = document.getElementById('vibrarSwitch');
+        const btnResetConfig = document.getElementById('btnResetConfig');
+
+        const historyContainer = document.getElementById('historyContainer');
+        const btnLimparHistorico = document.getElementById('btnLimparHistorico');
+
+        const toast = document.getElementById('toast');
+        const toastIcon = document.getElementById('toastIcon');
+        const toastText = document.getElementById('toastText');
+
+        // Navigation DOM Elements
+        const navBtnAnalise = document.getElementById('navBtnAnalise');
+        const navBtnHistorico = document.getElementById('navBtnHistorico');
+        const navBtnConfig = document.getElementById('navBtnConfig');
+
+        const tabAnalise = document.getElementById('tab-analise');
+        const tabHistorico = document.getElementById('tab-historico');
+        const tabConfiguracoes = document.getElementById('tab-configuracoes');
+
+        // Initial loading configuration
+        function initializeApp() {
+            // Load limits
+            const savedMinGood = localStorage.getItem('min_km_good');
+            const savedMinMedium = localStorage.getItem('min_km_medium');
+            const savedVibrate = localStorage.getItem('vibrate_on_analysis');
+            const savedHistory = localStorage.getItem('ride_analyses_history');
+
+            if (savedMinGood !== null) minGood = parseFloat(savedMinGood);
+            if (savedMinMedium !== null) minMedium = parseFloat(savedMinMedium);
+            if (savedVibrate !== null) vibrateEnabled = savedVibrate === 'true';
+            if (savedHistory !== null) {
+                try {
+                    history = JSON.parse(savedHistory);
+                } catch(e) {
+                    history = [];
+                }
+            }
+
+            // Sync with sliders and inputs
+            sliderGood.value = minGood;
+            sliderMedium.value = minMedium;
+            vibrarSwitch.checked = vibrateEnabled;
+
+            updateSliderUI();
+            renderHistory();
+            bindEvents();
+        }
+
+        function updateSliderUI() {
+            sliderValGood.innerText = `R$ ${parseFloat(sliderGood.value).toFixed(2)}/km`;
+            sliderValMedium.innerText = `R$ ${parseFloat(sliderMedium.value).toFixed(2)}/km`;
+        }
+
+        // Parse format text correctly to numeric
+        function parseInputValue(str) {
+            if (!str) return 0;
+            const cleaned = str.toString().replace(/[^0-9,.-]/g, '').replace(',', '.');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        // Format currencies
+        function formatBRL(value) {
+            return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // Call mobile phone vibration API
+        function triggerVibration(type) {
+            if (!vibrateEnabled || !navigator.vibrate) return;
+            try {
+                if (type === 'GREEN') {
+                    // Two rapid haptic bumps
+                    navigator.vibrate([100, 50, 100]);
+                } else if (type === 'YELLOW') {
+                    // One normal haptic bump
+                    navigator.vibrate(150);
+                } else {
+                    // Long persistent warning vibration
+                    navigator.vibrate(300);
+                }
+            } catch (e) {
+                console.log("Falha ao vibrar celular:", e);
+            }
+        }
+
+        // Pop high fidelity ambient Toast
+        function showToast(icon, message) {
+            toastIcon.innerText = icon;
+            toastText.innerText = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        // Execute calculations and evaluate thresholds
+        function executarAnalise() {
+            const val = parseInputValue(inputValor.value);
+            const dist = parseInputValue(inputDistance.value);
+            const time = parseInputValue(inputTime.value);
+
+            if (val <= 0 || dist <= 0 || time <= 0) {
+                // If interactive typing let's just make it silent. If click let's trigger alert.
+                return;
+            }
+
+            const rPerKm = val / dist;
+            const rPerHour = val / (time / 60);
+
+            let classification = "RED";
+            let recText = "RECUSAR";
+            let emoji = "🔴";
+            let explanation = `R$/km (${formatBRL(rPerKm)}) está abaixo da sua meta média de R$ ${minMedium.toFixed(2)}.`;
+
+            if (rPerKm >= minGood) {
+                classification = "GREEN";
+                recText = "ACEITAR";
+                emoji = "🟢";
+                explanation = `Excelente faturamento! R$/km supera sua meta verde de R$ ${minGood.toFixed(2)}.`;
+            } else if (rPerKm >= minMedium) {
+                classification = "YELLOW";
+                recText = "ANALISAR";
+                emoji = "🟡";
+                explanation = `R$/km equilibrado entre R$ ${minMedium.toFixed(2)} e R$ ${minGood.toFixed(2)}. Fica a seu critério.`;
+            }
+
+            // Render result Card
+            resultBox.className = "result-card active";
+            resultBox.classList.add(`type-${classification.toLowerCase()}`);
+            
+            resEmoji.innerText = emoji;
+            resRecommendation.innerText = recText;
+            resValPerKm.innerText = `R$ ${rPerKm.toFixed(2)} / km`;
+            resValPerHour.innerText = `R$ ${rPerHour.toFixed(0)} / h`;
+            resExplanation.innerText = explanation;
+
+            // Trigger Vibration effects
+            triggerVibration(classification);
+
+            // Trigger Toast notifications on real click/analyze trigger
+            showToast(emoji, `Recomendação: ${recText} (R$ ${rPerKm.toFixed(2)}/km)`);
+
+            // Register into history list
+            adicionarAoHistorico(val, dist, time, rPerKm, rPerHour, classification, recText);
+        }
+
+        // Interactive typing calculation engine
+        function runAutoCalculation() {
+            const val = parseInputValue(inputValor.value);
+            const dist = parseInputValue(inputDistance.value);
+            const time = parseInputValue(inputTime.value);
+
+            // Reset box if fields empty
+            if (val <= 0 || dist <= 0 || time <= 0) {
+                resultBox.className = "result-card";
+                return;
+            }
+
+            const rPerKm = val / dist;
+            const rPerHour = val / (time / 60);
+
+            let classification = "RED";
+            let recText = "RECUSAR";
+            let emoji = "🔴";
+            let explanation = `R$/km (${formatBRL(rPerKm)}) está abaixo da sua meta média de R$ ${minMedium.toFixed(2)}.`;
+
+            if (rPerKm >= minGood) {
+                classification = "GREEN";
+                recText = "ACEITAR";
+                emoji = "🟢";
+                explanation = `Excelente faturamento! R$/km supera sua meta verde de R$ ${minGood.toFixed(2)}.`;
+            } else if (rPerKm >= minMedium) {
+                classification = "YELLOW";
+                recText = "ANALISAR";
+                emoji = "🟡";
+                explanation = `R$/km equilibrado entre R$ ${minMedium.toFixed(2)} e R$ ${minGood.toFixed(2)}. Fica a seu critério.`;
+            }
+
+            resultBox.className = "result-card active";
+            resultBox.classList.add(`type-${classification.toLowerCase()}`);
+            
+            resEmoji.innerText = emoji;
+            resRecommendation.innerText = recText;
+            resValPerKm.innerText = `R$ ${rPerKm.toFixed(2)} / km`;
+            resValPerHour.innerText = `R$ ${rPerHour.toFixed(0)} / h`;
+            resExplanation.innerText = explanation;
+        }
+
+        // Manage dynamic history list
+        function adicionarAoHistorico(val, dist, time, rPerKm, rPerHour, classification, recText) {
+            // Check if last item is exactly identical to avoid duplicates when autotyping
+            if (history.length > 0) {
+                const head = history[0];
+                if (head.val === val && head.dist === dist && head.time === time) {
+                    return; // skip duplicate logging
+                }
+            }
+
+            const now = new Date();
+            const timeStampStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            const historyItem = {
+                id: Date.now(),
+                val,
+                dist,
+                time,
+                rPerKm,
+                rPerHour,
+                classification,
+                recText,
+                timeStr: timeStampStr
+            };
+
+            history.unshift(historyItem);
+
+            // Limit list size to top 10
+            if (history.length > 10) {
+                history.pop();
+            }
+
+            localStorage.setItem('ride_analyses_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            historyContainer.innerHTML = '';
+
+            if (history.length === 0) {
+                historyContainer.innerHTML = `
+                    <div class="empty-history">
+                        <span>📭</span>
+                        <p>Nenhuma análise registrada ainda.</p>
+                        <p style="font-size:11px; font-weight:normal;">As últimas 10 análises serão guardadas aqui.</p>
+                    </div>
+                `;
+                btnLimparHistorico.style.display = 'none';
+                return;
+            }
+
+            btnLimparHistorico.style.display = 'block';
+
+            history.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'history-item';
+                
+                let badgeClass = 'badge-red';
+                let emoji = '🔴';
+                if (item.classification === 'GREEN') {
+                    badgeClass = 'badge-green';
+                    emoji = '🟢';
+                } else if (item.classification === 'YELLOW') {
+                    badgeClass = 'badge-yellow';
+                    emoji = '🟡';
+                }
+
+                el.innerHTML = `
+                    <div class="history-item-details">
+                        <span class="history-metrics">R$ ${item.val.toFixed(2)} (${item.dist} km • ${item.time}m)</span>
+                        <span class="history-calculated">R$ ${item.rPerKm.toFixed(2)}/km • R$ ${item.rPerHour.toFixed(0)}/h</span>
+                        <span class="history-meta">Hoje às ${item.timeStr}</span>
+                    </div>
+                    <div class="badge ${badgeClass}">
+                        ${emoji} ${item.recText}
+                    </div>
+                `;
+                historyContainer.appendChild(el);
+            });
+        }
+
+        // Clean user interface values
+        function limparCampos() {
+            inputValor.value = '';
+            inputDistance.value = '';
+            inputTime.value = '';
+            resultBox.className = "result-card";
+            showToast("🗑️", "Campos limpos com sucesso");
+        }
+
+        // Set Tab change views 
+        function switchTab(targetTab) {
+            // Remove active classes
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
+
+            if (targetTab === 'analise') {
+                tabAnalise.classList.add('active');
+                navBtnAnalise.classList.add('active');
+            } else if (targetTab === 'historico') {
+                tabHistorico.classList.add('active');
+                navBtnHistorico.classList.add('active');
+            } else if (targetTab === 'config') {
+                tabConfiguracoes.classList.add('active');
+                navBtnConfig.classList.add('active');
+            }
+        }
+
+        // Bind interactive events listeners
+        function bindEvents() {
+            // Click/typing behaviors
+            btnAnalisar.addEventListener('click', executarAnalise);
+            btnLimpar.addEventListener('click', limparCampos);
+
+            // Real-time automatic calculations during input typing
+            const activeInputEvents = ['input', 'change', 'keyup'];
+            activeInputEvents.forEach(evt => {
+                inputValor.addEventListener(evt, runAutoCalculation);
+                inputDistance.addEventListener(evt, runAutoCalculation);
+                inputTime.addEventListener(evt, runAutoCalculation);
+            });
+
+            // Sliders limits setup actions
+            sliderGood.addEventListener('input', () => {
+                const goodVal = parseFloat(sliderGood.value);
+                const medVal = parseFloat(sliderMedium.value);
+                
+                if (goodVal < medVal) {
+                    sliderMedium.value = goodVal;
+                }
+                
+                minGood = parseFloat(sliderGood.value);
+                minMedium = parseFloat(sliderMedium.value);
+                
+                localStorage.setItem('min_km_good', minGood.toString());
+                localStorage.setItem('min_km_medium', minMedium.toString());
+                updateSliderUI();
+                runAutoCalculation();
+            });
+
+            sliderMedium.addEventListener('input', () => {
+                const goodVal = parseFloat(sliderGood.value);
+                const medVal = parseFloat(sliderMedium.value);
+                
+                if (medVal > goodVal) {
+                    sliderGood.value = medVal;
+                }
+                
+                minGood = parseFloat(sliderGood.value);
+                minMedium = parseFloat(sliderMedium.value);
+                
+                localStorage.setItem('min_km_good', minGood.toString());
+                localStorage.setItem('min_km_medium', minMedium.toString());
+                updateSliderUI();
+                runAutoCalculation();
+            });
+
+            vibrarSwitch.addEventListener('change', () => {
+                vibrateEnabled = vibrarSwitch.checked;
+                localStorage.setItem('vibrate_on_analysis', vibrateEnabled.toString());
+                if (vibrateEnabled && navigator.vibrate) {
+                    navigator.vibrate(100);
+                }
+            });
+
+            btnResetConfig.addEventListener('click', () => {
+                minGood = 2.20;
+                minMedium = 1.50;
+                vibrateEnabled = true;
+
+                localStorage.setItem('min_km_good', minGood.toString());
+                localStorage.setItem('min_km_medium', minMedium.toString());
+                localStorage.setItem('vibrate_on_analysis', vibrateEnabled.toString());
+
+                sliderGood.value = minGood;
+                sliderMedium.value = minMedium;
+                vibrarSwitch.checked = vibrateEnabled;
+
+                updateSliderUI();
+                showToast("⚙️", "Configurações restauradas!");
+            });
+
+            btnLimparHistorico.addEventListener('click', () => {
+                history = [];
+                localStorage.removeItem('ride_analyses_history');
+                renderHistory();
+                showToast("🗑️", "Histórico excluído");
+            });
+
+            // Navigation bar tab switches bindings
+            navBtnAnalise.addEventListener('click', () => switchTab('analise'));
+            navBtnHistorico.addEventListener('click', () => switchTab('historico'));
+            navBtnConfig.addEventListener('click', () => switchTab('config'));
+        }
+
+        // Auto launch app state
+        window.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>

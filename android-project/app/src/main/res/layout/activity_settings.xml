@@ -128,6 +128,68 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Fuel Settings Group -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Custos de Combustível"
+            android:textSize="14sp"
+            android:textColor="#4a5568"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Consumo Médio do Veículo (km/L):"
+                    android:textSize="14sp"
+                    android:textColor="#4a5568"/>
+
+                <EditText
+                    android:id="@+id/et_km_per_litre"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:hint="Ex: 10.0"
+                    android:textSize="16sp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="@android:drawable/editbox_background_normal"
+                    android:padding="12dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Preço do Litro do Combustível (R$):"
+                    android:textSize="14sp"
+                    android:textColor="#4a5568"/>
+
+                <EditText
+                    android:id="@+id/et_fuel_price"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:hint="Ex: 5.50"
+                    android:textSize="16sp"
+                    android:layout_marginTop="6dp"
+                    android:background="@android:drawable/editbox_background_normal"
+                    android:padding="12dp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Extras Group -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"

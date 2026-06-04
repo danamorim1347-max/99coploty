@@ -1,1470 +1,1391 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
-  Smartphone, 
-  Settings, 
-  FileCode, 
-  Check, 
-  Copy, 
   Sliders, 
-  ShieldAlert, 
-  Volume2, 
-  Info,
-  Layers, 
-  Play, 
-  X, 
-  HelpCircle,
-  Code,
+  Trash2, 
+  HelpCircle, 
+  DollarSign, 
+  MapPin, 
+  Clock, 
+  Info, 
+  Download, 
+  FileCode,
+  Smartphone,
+  Vibrate,
+  History,
   CheckCircle,
+  Copy,
+  Plus,
+  Play,
+  Flame,
+  Layout,
   Eye,
+  Settings,
+  AlertCircle,
   TrendingUp,
-  MapPin,
-  Compass,
-  AlertTriangle,
-  Folder,
-  ChevronRight,
-  ExternalLink,
-  ChevronDown,
-  Moon,
-  Sun
+  Sparkles,
+  Upload,
+  X,
+  Gauge,
+  Percent,
+  Compass
 } from "lucide-react";
 import { androidFiles } from "./data/androidFiles";
 
-// Definindo Interface para a Corrida do Simulador
-interface RidePreset {
-  id: string;
-  name: string;
-  value: number;
-  distance: number;
-  duration: number;
-  origin: string;
-  destination: string;
-  rawText: string;
+// Structured types for simulated rides
+interface SimulatedRide {
+  id: number;
+  val: number;
+  dist: number;
+  time: number;
+  region: string;
+  searchDistance: number;
+  rPerKm: number;
+  rPerHour: number;
+  fuelCost: number;
+  netProfit: number;
+  score: number;
+  ratingStars: string;
+  ratingText: string;
+  classification: "EXCELENTE" | "ACEITAVEL" | "RUIM";
+  isAccepted: boolean; // Driver toggleable action
+  timeStr: string;
+  isSimulatedOcr?: boolean;
 }
 
 export default function App() {
-  // Seletor de Modo de Visualização Principal: 'combo' (PC Integrado) ou 'apk' (Celular em Tela Cheia)
-  const [viewMode, setViewMode] = useState<"combo" | "apk">("combo");
-  // Aba selecionada no modo APK
-  const [apkTab, setApkTab] = useState<"dashboard" | "settings" | "simulator" | "code" | "help">("dashboard");
+  // Navigation tabs for the web mockup
+  const [activeTab, setActiveTab] = useState<"analisar" | "dashboard" | "historico" | "ajustes" | "codigo">("analisar");
+  
+  // Selected Kotlin/XML file from our native visualizer companion
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
 
-  // Auto-detectar se é tela pequena (mobile) na inicialização para entrar direto no modo APK
+  // Core smart calculation inputs (driver state)
+  const [inputValor, setInputValor] = useState<string>("48,50");
+  const [inputDistance, setInputDistance] = useState<string>("12,4");
+  const [inputTime, setInputTime] = useState<string>("22");
+  const [inputRegion, setInputRegion] = useState<string>("Zona Sul (Itaim Bibi)");
+  const [inputSearchDistance, setInputSearchDistance] = useState<string>("1,2");
+
+  // Fuel & Optimization target settings
+  const [minGood, setMinGood] = useState<number>(2.20);
+  const [minMedium, setMinMedium] = useState<number>(1.50);
+  const [minHour, setMinHour] = useState<number>(45.00);
+  const [kmPerLitre, setKmPerLitre] = useState<number>(10.0);
+  const [fuelPrice, setFuelPrice] = useState<number>(5.50);
+  const [desiredAcceptRate, setDesiredAcceptRate] = useState<number>(75);
+  const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
+
+  // Draggable Floating Overlay trigger state
+  const [showOverlay, setShowOverlay] = useState<boolean>(true);
+  const [overlayPosition, setOverlayPosition] = useState({ x: 20, y: 150 });
+
+  // OCR state machine (simulating local ML Kit algorithm feedback)
+  const [ocrStatus, setOcrStatus] = useState<"idle" | "reading" | "success">("idle");
+  const [activeSimulatedTemplate, setActiveSimulatedTemplate] = useState<string | null>(null);
+
+  // Alert & feedback notifications
+  const [toast, setToast] = useState<{ show: boolean; icon: string; message: string }>({
+    show: false,
+    icon: "🚦",
+    message: ""
+  });
+  const [isShaking, setIsShaking] = useState<boolean>(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Preloaded mock database history for beautiful dashboard state
+  const [history, setHistory] = useState<SimulatedRide[]>([]);
+
+  // Local key-value database state loaders
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      if (window.innerWidth < 1024) {
-        setViewMode("apk");
+    const savedGood = localStorage.getItem("copilot_km_good");
+    const savedMedium = localStorage.getItem("copilot_km_medium");
+    const savedHour = localStorage.getItem("copilot_hour");
+    const savedKmL = localStorage.getItem("copilot_km_per_litre");
+    const savedFuel = localStorage.getItem("copilot_fuel_price");
+    const savedAcceptRate = localStorage.getItem("copilot_accept_rate");
+    const savedVibrate = localStorage.getItem("copilot_vibrate");
+    const savedHistoryStr = localStorage.getItem("copilot_rides_history");
+
+    if (savedGood) setMinGood(parseFloat(savedGood));
+    if (savedMedium) setMinMedium(parseFloat(savedMedium));
+    if (savedHour) setMinHour(parseFloat(savedHour));
+    if (savedKmL) setKmPerLitre(parseFloat(savedKmL));
+    if (savedFuel) setFuelPrice(parseFloat(savedFuel));
+    if (savedAcceptRate) setDesiredAcceptRate(parseInt(savedAcceptRate));
+    if (savedVibrate) setVibrateEnabled(savedVibrate === "true");
+
+    if (savedHistoryStr) {
+      try {
+        setHistory(JSON.parse(savedHistoryStr));
+      } catch (e) {
+        loadPredefinedHistory();
       }
+    } else {
+      loadPredefinedHistory();
     }
   }, []);
 
-  // --- STATE DO SIMULADOR ---
-  const [minKmGood, setMinKmGood] = useState<number>(3.0);
-  const [minKmMedium, setMinKmMedium] = useState<number>(2.0);
-  const [minHour, setMinHour] = useState<number>(50.0);
-  const [isVibrateEnabled, setIsVibrateEnabled] = useState<boolean>(true);
-  const [isOverlayEnabled, setIsOverlayEnabled] = useState<boolean>(true);
-  
-  // Permissões Simuladas do Telefone
-  const [accessibilityPermitted, setAccessibilityPermitted] = useState<boolean>(true);
-  const [overlayPermitted, setOverlayPermitted] = useState<boolean>(true);
-
-  // Estados de Visualização Internos do Telefone
-  // 'gigu_dashboard' | 'gigu_settings' | 'app_99'
-  const [phoneScreen, setPhoneScreen] = useState<string>("gigu_dashboard");
-  
-  // Estado para aba selecionada no painel de Configurar Metas do Telefone
-  const [tempKmGood, setTempKmGood] = useState<string>("3.0");
-  const [tempKmMedium, setTempKmMedium] = useState<string>("2.0");
-  const [tempHour, setTempHour] = useState<string>("50.0");
-  
-  // Corrida Ativa no Simulador 99
-  const [activeRide, setActiveRide] = useState<RidePreset | null>(null);
-  const [customText, setCustomText] = useState<string>("");
-  const [isVibrating, setIsVibrating] = useState<boolean>(false);
-  
-  // Controle do Overlay Flutuante do Semáforo
-  const [showOverlay, setShowOverlay] = useState<boolean>(false);
-  const [overlayData, setOverlayData] = useState<{
-    value: number;
-    distance: number;
-    duration: number;
-    valuePerKm: number;
-    valuePerHour: number;
-    classification: "GOOD" | "MEDIUM" | "BAD";
-    emoji: string;
-  } | null>(null);
-  
-  const [timeLeft, setTimeLeft] = useState<number>(5); // 5 segundos
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const phoneScreenRef = useRef<HTMLDivElement | null>(null);
-
-  // --- STATE DO CODE EXPLORER ---
-  const [selectedFile, setSelectedFile] = useState<typeof androidFiles[0]>(androidFiles[0]);
-  const [copiedFileId, setCopiedFileId] = useState<boolean>(false);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
-    "app": true,
-    "app/src": true,
-    "app/src/main": true,
-    "app/src/main/java": true,
-    "app/src/main/res": true,
-    "app/src/main/res/layout": true,
-  });
-
-  // Presets de corridas da 99 para simulação rápida
-  const ridePresets: RidePreset[] = [
-    {
-      id: "ride_good",
-      name: "Excelente (Verde 🟢)",
-      value: 22.50,
-      distance: 4.5,
-      duration: 12,
-      origin: "Jardins, Al. Lorena 1400",
-      destination: "Av. Paulista, Shopping Cidade São Paulo",
-      rawText: "99Oferta!\nCorrida para você:\nValor: R$ 22,50\nDistância: 4.5 km\nTempo estimado: 12 min\nAceitar?"
-    },
-    {
-      id: "ride_medium",
-      name: "Aceitável (Amarelo 🟡)",
-      value: 14.80,
-      distance: 6.2,
-      duration: 15,
-      origin: "Vila Olímpia, R. Funchal",
-      destination: "Pinheiros, R. dos Pinheiros 800",
-      rawText: "99 Oferta de Viagem\nMotorista Parceiro\nFaturamento: R$ 14,80\nDistância completa: 6,2km\nTempo estimado de percurso: 15minutos"
-    },
-    {
-      id: "ride_bad",
-      name: "Prejuízo (Vermelho 🔴)",
-      value: 9.20,
-      distance: 11.5,
-      duration: 25,
-      origin: "Moema, Av. Ibirapuera",
-      destination: "Ipiranga, R. Silva Bueno",
-      rawText: "Oferta Recusável - 99\nViagem individual\nR$9,20 no total\nPercurso aproximado de 11.5km\nDuração prevista: 25 minutos"
-    },
-    {
-      id: "ride_short",
-      name: "Curta & Excelente (Verde 🟢)",
-      value: 12.00,
-      distance: 1.8,
-      duration: 6,
-      origin: "Consolação, Metrô",
-      destination: "Bela Vista, R. Augusta 450",
-      rawText: "Popup 99\nR$ 12,00\n1.8 km\n6 min"
-    }
-  ];
-
-  // Sincronizar inputs temporários quando abre configurações
-  useEffect(() => {
-    if (phoneScreen === "gigu_settings") {
-      setTempKmGood(minKmGood.toString());
-      setTempKmMedium(minKmMedium.toString());
-      setTempHour(minHour.toString());
-    }
-  }, [phoneScreen]);
-
-  // Função para lidar com o trigger de análise quando uma corrida aparece na 99
-  const triggerRideAnalysis = (ride: { value: number; distance: number; duration: number; rawText: string }) => {
-    // 1. Simular o parseador Regex idêntico ao Kotlin
-    const parsedValue = ride.value;
-    const parsedDistance = ride.distance;
-    const parsedDuration = ride.duration;
-
-    const valPerKm = parsedDistance > 0 ? parsedValue / parsedDistance : 0;
-    const valPerHour = parsedDuration > 0 ? parsedValue / (parsedDuration / 60) : 0;
-
-    // Classificação conforme limites
-    let classification: "GOOD" | "MEDIUM" | "BAD" = "BAD";
-    let emoji = "🔴";
-
-    if (valPerKm >= minKmGood && valPerHour >= minHour) {
-      classification = "GOOD";
-      emoji = "🟢";
-    } else if (valPerKm >= minKmMedium) {
-      classification = "MEDIUM";
-      emoji = "🟡";
-    } else {
-      classification = "BAD";
-      emoji = "🔴";
-    }
-
-    // Configura dados do overlay flutuante
-    setOverlayData({
-      value: parsedValue,
-      distance: parsedDistance,
-      duration: parsedDuration,
-      valuePerKm: valPerKm,
-      valuePerHour: valPerHour,
-      classification,
-      emoji
-    });
-
-    // Vibrar se ativo
-    if (isVibrateEnabled) {
-      setIsVibrating(true);
-      setTimeout(() => setIsVibrating(false), 400);
-    }
-
-    // Mostrar overlay se permissões estão ok
-    if (accessibilityPermitted && overlayPermitted && isOverlayEnabled) {
-      setShowOverlay(true);
-      setTimeLeft(5);
-
-      // Limpar timers anteriores se existirem
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-
-      // Inicia contagem regressiva visual
-      intervalRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 0.1) {
-            clearInterval(intervalRef.current!);
-            return 0;
-          }
-          return prev - 0.1;
-        });
-      }, 100);
-
-      // Auto ocultar após 5 segundos
-      timerRef.current = setTimeout(() => {
-        setShowOverlay(false);
-      }, 5000);
-    }
+  // Preloads the history with beautiful sample data so dashboard displays immediately
+  const loadPredefinedHistory = () => {
+    const defaultHistory: SimulatedRide[] = [
+      {
+        id: Date.now() - 40000000,
+        val: 78.50,
+        dist: 22.0,
+        time: 38,
+        region: "Aeroporto de Congonhas",
+        searchDistance: 1.5,
+        rPerKm: 78.50 / (22.0 + 1.5),
+        rPerHour: 78.50 / (38 / 60),
+        fuelCost: ((22.0 + 1.5) / 10.0) * 5.50,
+        netProfit: 78.50 - (((22.0 + 1.5) / 10.0) * 5.50),
+        score: 93,
+        ratingStars: "⭐⭐⭐⭐⭐",
+        ratingText: "Vale muito a pena!",
+        classification: "EXCELENTE",
+        isAccepted: true,
+        timeStr: "11:24"
+      },
+      {
+        id: Date.now() - 30000000,
+        val: 18.00,
+        dist: 4.8,
+        time: 14,
+        region: "Vila Olimpia",
+        searchDistance: 0.8,
+        rPerKm: 18.00 / (4.8 + 0.8),
+        rPerHour: 18.00 / (14 / 60),
+        fuelCost: ((4.8 + 0.8) / 10.0) * 5.50,
+        netProfit: 18.00 - (((4.8 + 0.8) / 10.0) * 5.50),
+        score: 79,
+        ratingStars: "⭐⭐⭐⭐",
+        ratingText: "Excelente oportunidade!",
+        classification: "ACEITAVEL",
+        isAccepted: true,
+        timeStr: "10:15"
+      },
+      {
+        id: Date.now() - 20000000,
+        val: 14.20,
+        dist: 9.3,
+        time: 28,
+        region: "Grajau (Via Marginal)",
+        searchDistance: 2.1,
+        rPerKm: 14.20 / (9.3 + 2.1),
+        rPerHour: 14.20 / (28 / 60),
+        fuelCost: ((9.3 + 2.1) / 10.0) * 5.50,
+        netProfit: 14.20 - (((9.3 + 2.1) / 10.0) * 5.50),
+        score: 28,
+        ratingStars: "⭐",
+        ratingText: "Recuse imediatamente. Prejuízo!",
+        classification: "RUIM",
+        isAccepted: false,
+        timeStr: "09:42"
+      }
+    ];
+    setHistory(defaultHistory);
+    localStorage.setItem("copilot_rides_history", JSON.stringify(defaultHistory));
   };
 
-  // Disparar Preset selecionado
-  const handleSelectPreset = (preset: RidePreset) => {
-    setActiveRide(preset);
-    setCustomText(preset.rawText);
-    triggerRideAnalysis(preset);
+  // Toast trigger helper
+  const triggerToast = (icon: string, message: string) => {
+    setToast({ show: true, icon, message });
+    setTimeout(() => {
+      setToast((prev) => ({ ...prev, show: false }));
+    }, 3000);
   };
 
-  // Processar texto customizado inserido pelo motorista
-  const handleProcessCustomText = () => {
-    if (!customText.trim()) return;
-
-    // Regexes idênticas ao Kotlin no AnalysisService:
-    // 1. Preço: R$ XX.XX
-    const priceRegex = /R\$\s*(\d+[,.]\d{2})/;
-    // 2. Distância: XX.X km
-    const distRegex = /(\d+[,.]?\d*)\s*(?:km|KM)/;
-    // 3. Tempo: XX min
-    const timeRegex = /(\d+)\s*(?:min|minutos)/;
-
-    const priceMatch = customText.match(priceRegex);
-    const distMatch = customText.match(distRegex);
-    const timeMatch = customText.match(timeRegex);
-
-    let val = 12.50;
-    let dst = 4.2;
-    let tme = 10;
-
-    if (priceMatch) {
-      val = parseFloat(priceMatch[1].replace(",", "."));
-    }
-    if (distMatch) {
-      dst = parseFloat(distMatch[1].replace(",", "."));
-    }
-    if (timeMatch) {
-      tme = parseInt(timeMatch[1], 10);
-    }
-
-    const customRide: RidePreset = {
-      id: "custom_ride",
-      name: "Texto Bruto Capturado",
-      value: val,
-      distance: dst,
-      duration: tme,
-      origin: "Origem Detectada no App",
-      destination: "Destino Detectado no App",
-      rawText: customText
-    };
-
-    setActiveRide(customRide);
-    triggerRideAnalysis(customRide);
+  // Safe float parsing helper
+  const parseCurrencyInput = (str: string): number => {
+    if (!str) return 0;
+    const cleaned = str.replace(/[^0-9,.-]/g, "").replace(",", ".");
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Salvar configurações no simulador
-  const handleSaveSettings = () => {
-    const kmGood = parseFloat(tempKmGood) || 3.0;
-    const kmMedium = parseFloat(tempKmMedium) || 2.0;
-    const hour = parseFloat(tempHour) || 50.0;
+  // Numeric parameters calculated on state change
+  const valNum = parseCurrencyInput(inputValor);
+  const distNum = parseCurrencyInput(inputDistance);
+  const timeNum = parseCurrencyInput(inputTime);
+  const searchDistNum = parseCurrencyInput(inputSearchDistance);
 
-    if (kmMedium > kmGood) {
-      alert("Alerta: O valor aceitável (amarelo) não deve ser maior que o valor excelente (verde)!");
+  const canAnalyzeComp = valNum > 0 && distNum > 0 && timeNum > 0;
+  
+  // R$/km factoring in pickup distance (search distance)
+  const rPerKm = canAnalyzeComp ? valNum / (distNum + searchDistNum) : 0;
+  const rPerHour = canAnalyzeComp ? valNum / (timeNum / 60) : 0;
+
+  // Fuel operational computations
+  const totalKmToDrive = distNum + searchDistNum;
+  const fuelCost = kmPerLitre > 0 ? (totalKmToDrive / kmPerLitre) * fuelPrice : 0;
+  const netProfit = canAnalyzeComp ? Math.max(0, valNum - fuelCost) : 0;
+
+  // Custom 0-100 scoring algorithm (matching Kotlin spec)
+  const calculateDisplayScore = (): number => {
+    if (!canAnalyzeComp) return 0;
+    let points = 0;
+
+    // 1. R$/km rate score component (Max 45 points)
+    const ratioKm = rPerKm / minGood;
+    points += Math.min(45, ratioKm * 40);
+    if (rPerKm >= minGood) points += 5;
+
+    // 2. Earnings per hour rate component (Max 35 points)
+    const ratioHour = rPerHour / minHour;
+    points += Math.min(35, ratioHour * 30);
+    if (rPerHour >= minHour) points += 5;
+
+    // 3. Search distance component (Max 10 points)
+    if (searchDistNum <= 1.0) points += 10;
+    else if (searchDistNum <= 2.0) points += 7;
+    else if (searchDistNum <= 3.0) points += 4;
+
+    // 4. Net margin factor (Max 10 points)
+    const profitMargin = valNum > 0 ? netProfit / valNum : 0;
+    points += Math.min(10, profitMargin * 12);
+
+    return Math.min(100, Math.max(0, Math.round(points)));
+  };
+
+  const calculatedScore = calculateDisplayScore();
+
+  // Score description classification triggers
+  const getScoreFeedbackDetails = (score: number) => {
+    if (score >= 90) return { stars: "⭐⭐⭐⭐⭐", feedback: "Excelente! Recuse nada aqui.", classification: "EXCELENTE" as const };
+    if (score >= 75) return { stars: "⭐⭐⭐⭐", feedback: "Ótima oportunidade!", classification: "EXCELENTE" as const };
+    if (score >= 60) return { stars: "⭐⭐⭐", feedback: "Razoável. Bom aceitar.", classification: "ACEITAVEL" as const };
+    if (score >= 45) return { stars: "⭐⭐", feedback: "Risco alto. Avalie o trânsito.", classification: "ACEITAVEL" as const };
+    return { stars: "⭐", feedback: "Não compensa. Margem baixíssima!", classification: "RUIM" as const };
+  };
+
+  const activeFeedback = getScoreFeedbackDetails(calculatedScore);
+
+  // Executing the main calculation trigger and saving into SQLite Room-mock
+  const handleAnalyzeAndSave = () => {
+    if (!canAnalyzeComp) {
+      triggerToast("⚠️", "Preencha os campos para calcular a rota!");
       return;
     }
 
-    setMinKmGood(kmGood);
-    setMinKmMedium(kmMedium);
-    setMinHour(hour);
-    setPhoneScreen("gigu_dashboard");
+    if (vibrateEnabled) {
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 300);
+      if (navigator.vibrate) {
+        navigator.vibrate(calculatedScore >= 70 ? [100, 50, 100] : 300);
+      }
+    }
+
+    // Insert into mock Room db
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+    const newRide: SimulatedRide = {
+      id: Date.now(),
+      val: valNum,
+      dist: distNum,
+      time: timeNum,
+      region: inputRegion.trim() || "Zona Principal",
+      searchDistance: searchDistNum,
+      rPerKm,
+      rPerHour,
+      fuelCost,
+      netProfit,
+      score: calculatedScore,
+      ratingStars: activeFeedback.stars,
+      ratingText: activeFeedback.feedback,
+      classification: activeFeedback.classification,
+      isAccepted: calculatedScore >= 60, // Auto accepted heuristics on highly graded rides
+      timeStr
+    };
+
+    const updated = [newRide, ...history].slice(0, 15);
+    setHistory(updated);
+    localStorage.setItem("copilot_rides_history", JSON.stringify(updated));
+
+    triggerToast(
+      calculatedScore >= 60 ? "🟢" : calculatedScore >= 45 ? "🟡" : "🔴",
+      `Copilot Nota ${calculatedScore}/100: ${activeFeedback.classification === "EXCELENTE" ? "Excelente Corrida!" : activeFeedback.classification === "ACEITAVEL" ? "Corrida Razoável" : "Prejuízo! Melhor Recusar."}`
+    );
   };
 
-  // Copiar código do arquivo selecionado
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(selectedFile.content);
-    setCopiedFileId(true);
-    setTimeout(() => setCopiedFileId(false), 2000);
+  // Simulates ML Kit local OCR reading from mock 99 offers
+  const triggerSimulatedOcr = (type: "vip" | "medium" | "ruim") => {
+    setOcrStatus("reading");
+    setActiveSimulatedTemplate(type);
+    
+    // Simulate reading timeline feedback
+    setTimeout(() => {
+      if (type === "vip") {
+        setInputValor("68,00");
+        setInputDistance("14,8");
+        setInputTime("25");
+        setInputRegion("Aeroporto de Guarulhos");
+        setInputSearchDistance("0,9");
+      } else if (type === "medium") {
+        setInputValor("22,50");
+        setInputDistance("8,2");
+        setInputTime("20");
+        setInputRegion("Shopping Ibirapuera");
+        setInputSearchDistance("1,5");
+      } else {
+        setInputValor("13,40");
+        setInputDistance("10,5");
+        setInputTime("31");
+        setInputRegion("Vila Nova Cachoeirinha");
+        setInputSearchDistance("2,8");
+      }
+      setOcrStatus("success");
+      triggerToast("🎯", "OCR local com ML Kit parseado com sucesso!");
+      
+      // Auto analyze after ocr success
+      setTimeout(() => {
+        setOcrStatus("idle");
+        setActiveSimulatedTemplate(null);
+      }, 1000);
+    }, 1200);
   };
 
-  // Formatar código Kotlin de forma legível (com highlight básico manual de regexes)
-  const renderCodeSnippet = (content: string) => {
-    return content.split("\n").map((line, i) => {
-      // Highlight simples de palavras-chave
-      let formattedLine = line
-        .replace(/(package|import|class|interface|data class|enum class|override fun|fun|private lateinit var|private var|val|var|return|if|else|when|try|catch|get\(\)|set\(\))(\s+)/g, '<span class="text-amber-400 font-semibold">$1</span>$2')
-        .replace(/(override|private|public|internal|inline|get|set)(\s+)/g, '<span class="text-amber-400 font-semibold">$1</span>$2')
-        .replace(/("[^"]*")/g, '<span class="text-green-400">$1</span>')
-        .replace(/(\/\/.*)/g, '<span class="text-zinc-650 italic">$1</span>');
+  const handleClearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem("copilot_rides_history");
+    triggerToast("🗑️", "Histórico local do Room limpo com sucesso!");
+  };
 
-      return (
-        <div key={i} className="table-row">
-          <span className="table-cell text-right text-zinc-600 pr-4 select-none text-xs w-8 border-r border-zinc-900 mr-2">{i + 1}</span>
-          <span className="table-cell pl-4 text-zinc-350 whitespace-pre font-mono text-xs" dangerouslySetInnerHTML={{ __html: formattedLine }}></span>
-        </div>
-      );
+  // Allows drivers to toggle accepted/refused status of an evaluated ride to show real-time changes on dashboard
+  const toggleRideAccepted = (id: number) => {
+    const updated = history.map((item) => {
+      if (item.id === id) {
+        const nextState = !item.isAccepted;
+        return { 
+          ...item, 
+          isAccepted: nextState,
+          netProfit: nextState ? item.val - item.fuelCost : 0 // Refused rides earn 0 final profit
+        };
+      }
+      return item;
     });
+    setHistory(updated);
+    localStorage.setItem("copilot_rides_history", JSON.stringify(updated));
+    triggerToast("🔄", "Mapeamento aceito/recusado atualizado. Dashboard recalculado!");
   };
 
-  // Toggle expansão das pastas de código
-  const toggleFolder = (path: string) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [path]: !prev[path]
-    }));
+  // Dashboard Aggregates based on accepted historical listings
+  const totalAcceptedRides = history.filter((r) => r.isAccepted).length;
+  const totalRefusedRides = history.filter((r) => !r.isAccepted).length;
+  const totalGainsRaw = history.filter((r) => r.isAccepted).reduce((acc, curr) => acc + curr.val, 0);
+  const totalNetGains = history.filter((r) => r.isAccepted).reduce((acc, curr) => acc + curr.netProfit, 0);
+  
+  const avgKmGainRate = totalAcceptedRides > 0 
+    ? history.filter((r) => r.isAccepted).reduce((acc, curr) => acc + curr.rPerKm, 0) / totalAcceptedRides 
+    : 0;
+
+  const currentAcceptanceRateCalculated = history.length > 0
+    ? Math.round((totalAcceptedRides / history.length) * 100)
+    : 0;
+
+  // Best Region calculation heuristic
+  const getBestProfitRegion = () => {
+    if (history.length === 0) return "Nenhuma registrada";
+    const counts: { [key: string]: number } = {};
+    history.filter(r => r.isAccepted).forEach((r) => {
+      counts[r.region] = (counts[r.region] || 0) + r.netProfit;
+    });
+    let best = "Zona Central";
+    let maxVal = 0;
+    Object.keys(counts).forEach((key) => {
+      if (counts[key] > maxVal) {
+        maxVal = counts[key];
+        best = key;
+      }
+    });
+    return best;
   };
 
-  // Componente de pasta no explorer
-  const FolderNode = ({ name, path, childrenCount, root = false }: { name: string, path: string, childrenCount?: number, root?: boolean }) => {
-    const isExpanded = expandedFolders[path];
-    return (
-      <div 
-        onClick={() => toggleFolder(path)}
-        className="flex items-center gap-1.5 py-1.5 px-2.5 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-300 font-sans text-xs select-none transition"
-        style={{ paddingLeft: root ? "8px" : `${(path.split('/').length) * 10}px` }}
-      >
-        <ChevronRight size={14} className={`text-zinc-500 transition-transform ${isExpanded ? "rotate-90 text-zinc-300" : ""}`} />
-        <Folder size={14} className="text-amber-500 fill-amber-950/40 border border-amber-500/20" />
-        <span className="font-medium">{name}</span>
-        {childrenCount !== undefined && <span className="text-[10px] text-zinc-500 font-mono">({childrenCount})</span>}
-      </div>
-    );
+  const bestRegionCalculated = getBestProfitRegion();
+
+  const handleCopyFilesSource = (index: number, codeStr: string) => {
+    setCopiedIndex(index);
+    navigator.clipboard.writeText(codeStr);
+    setTimeout(() => setCopiedIndex(null), 2500);
+    triggerToast("📋", `${androidFiles[index].name} copiado para a área de transferência!`);
   };
-
-  if (viewMode === "apk") {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans pb-24">
-        {/* HEADER */}
-        <header className="bg-zinc-950/90 border-b border-zinc-900 backdrop-blur-md sticky top-0 z-40 px-5 py-4 shrink-0">
-          <div className="max-w-md mx-auto flex justify-between items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🚦</span>
-              <div>
-                <h1 className="text-sm font-black text-white leading-none">99 Ride Analyzer</h1>
-                <span className="text-[9px] text-amber-505 font-bold font-mono tracking-wider">APK BUILD v2.4</span>
-              </div>
-            </div>
-            
-            {/* Toggle de retorno */}
-            <button
-              onClick={() => setViewMode("combo")}
-              className="px-3 py-1.5 bg-zinc-900 border border-zinc-805 text-[10px] font-bold text-zinc-300 rounded-xl hover:text-white transition flex items-center gap-1 cursor-pointer select-none"
-            >
-              <Layers size={10} />
-              <span>Modo PC</span>
-            </button>
-          </div>
-        </header>
-
-        {/* CONTAINER CONTEÚDO */}
-        <div className="flex-1 overflow-y-auto">
-          {/* PAINEL (DASHBOARD TAB) */}
-          {apkTab === "dashboard" && (
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-5">
-              <div className="bg-zinc-900/60 border border-zinc-850 p-5 rounded-3xl shadow-lg">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">Status de Monitoramento</p>
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs font-black px-3.5 py-1.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
-                    ● AUTO-READ MOCK
-                  </span>
-                  <span className="text-[9px] font-mono text-zinc-500 bg-zinc-950 px-2 py-0.5 rounded border border-zinc-850 font-bold">
-                    APK READY
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-amber-500/5 border border-amber-500/15 p-5 rounded-3xl flex gap-3 text-xs text-zinc-400 leading-relaxed">
-                <Info size={18} className="text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-extrabold text-amber-500 mb-1 text-sm">Aviso de Empacotamento Web (WebToAPK):</h4>
-                  Você instalou ou empacotou com o APK Creator (<strong>com.apkcreator.frankwebstudio</strong>). <br /><br />
-                  Esta versão funciona como um excelente <strong>Painel e Simulador de bolso</strong>. <br /><br />
-                  Para que o sensor de semáforo leia o app da 99 original de forma <strong>100% automática</strong>, é necessário compilar como código Kotlin nativo. Baixe o código completo na aba <strong>Código</strong> abaixo!
-                </div>
-              </div>
-
-              <div className="bg-zinc-900/40 border border-zinc-850 p-5 rounded-3xl">
-                <h3 className="font-bold text-xs text-zinc-300 mb-3.5 uppercase tracking-wider flex items-center gap-2">
-                  <Sliders size={13} className="text-amber-500" />
-                  Metas Ativas do Filtrador
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-zinc-950 p-3 rounded-2xl text-center border border-zinc-850">
-                    <p className="text-[9px] text-zinc-500 mb-1">🟢 Excelente</p>
-                    <p className="text-xs font-black font-mono text-green-400">≥ R$ {minKmGood.toFixed(1)}/k</p>
-                  </div>
-                  <div className="bg-zinc-950 p-3 rounded-2xl text-center border border-zinc-850">
-                    <p className="text-[9px] text-zinc-500 mb-1">🟡 Aceitável</p>
-                    <p className="text-xs font-black font-mono text-yellow-500">≥ R$ {minKmMedium.toFixed(1)}/k</p>
-                  </div>
-                  <div className="bg-zinc-950 p-3 rounded-2xl text-center border border-zinc-850">
-                    <p className="text-[9px] text-zinc-500 mb-1">⏱️ Ganhos/h</p>
-                    <p className="text-xs font-black font-mono text-zinc-150">≥ R$ {minHour.toFixed(0)}/h</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-zinc-900/60 border border-zinc-850 p-5 rounded-3xl flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-xs text-zinc-200">Efeitos Táteis / Vibração</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">Sinalizar fisicamente novas corridas</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer select-none">
-                  <input 
-                    type="checkbox" 
-                    checked={isVibrateEnabled}
-                    onChange={() => setIsVibrateEnabled(!isVibrateEnabled)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-6 bg-zinc-850 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-zinc-950 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-zinc-300 after:border-zinc-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-black peer-checked:after:border-black"></div>
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* METAS (SETTINGS TAB) */}
-          {apkTab === "settings" && (
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-4">
-              <div className="bg-zinc-900/60 border border-zinc-850 p-5 rounded-3xl shadow-md flex flex-col gap-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider pb-2 border-b border-zinc-850">Configurar Filtros</h3>
-                
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 mb-1.5 uppercase">Meta Verde Excelente (🟢 R$/km)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    value={tempKmGood}
-                    onChange={(e) => setTempKmGood(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl text-white font-mono focus:outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 mb-1.5 uppercase">Meta Média Amarela (🟡 R$/km)</label>
-                  <input 
-                    type="number" 
-                    step="0.1"
-                    value={tempKmMedium}
-                    onChange={(e) => setTempKmMedium(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl text-white font-mono focus:outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 mb-1.5 uppercase">Meta de Retorno por Hora (R$/h)</label>
-                  <input 
-                    type="number" 
-                    step="5"
-                    value={tempHour}
-                    onChange={(e) => setTempHour(e.target.value)}
-                    className="w-full text-xs p-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl text-white font-mono focus:outline-hidden"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-2 border-t border-zinc-900">
-                  <input 
-                    type="checkbox" 
-                    id="checkVibrateApk"
-                    checked={isVibrateEnabled}
-                    onChange={() => setIsVibrateEnabled(!isVibrateEnabled)}
-                    className="rounded border-zinc-800 bg-zinc-950 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
-                  />
-                  <label htmlFor="checkVibrateApk" className="text-xs font-semibold text-zinc-300 cursor-pointer select-none">
-                    Vibrar ao receber nova corrida
-                  </label>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const kmGood = parseFloat(tempKmGood) || 3.0;
-                    const kmMedium = parseFloat(tempKmMedium) || 2.0;
-                    const hour = parseFloat(tempHour) || 50.0;
-                    if (kmMedium > kmGood) {
-                      alert("O valor excelente deve ser maior que o aceitável.");
-                      return;
-                    }
-                    setMinKmGood(kmGood);
-                    setMinKmMedium(kmMedium);
-                    setMinHour(hour);
-                    setApkTab("dashboard");
-                    alert("Metas atualizadas com sucesso neste dispositivo!");
-                  }}
-                  className="w-full bg-amber-500 text-black py-4 rounded-2xl text-xs font-black cursor-pointer select-none"
-                >
-                  GRAVAR METAS
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* SIMULADOR (SIMULATOR TAB) */}
-          {apkTab === "simulator" && (
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-4">
-              <div className="relative w-full h-[250px] rounded-3xl border border-zinc-850 overflow-hidden bg-zinc-950 select-none">
-                <div className="bg-[#FF5500] text-slate-950 px-3.5 py-1.5 flex justify-between items-center">
-                  <span className="font-extrabold text-[9px] uppercase">99 Driver PRO</span>
-                  <span className="text-[8px] bg-white px-2 py-0.5 rounded-full font-black">ONLINE</span>
-                </div>
-                
-                <div className="absolute inset-0 top-7 bg-[#151518] flex items-center justify-center">
-                  <Compass className="text-amber-500 animate-spin text-opacity-15" size={24} style={{ animationDuration: '8s' }} />
-                  
-                  {/* Floating Overlay semáforo rating */}
-                  {showOverlay && overlayData && (
-                    <div className={`absolute z-30 top-1.5 left-2 right-2 p-3 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl ${
-                      overlayData.classification === "GOOD" ? "ring-1 ring-green-500/25" : overlayData.classification === "MEDIUM" ? "ring-1 ring-yellow-500/25" : "ring-1 ring-red-500/25"
-                    }`}>
-                      <div className="flex gap-2">
-                        <span className="text-2xl animate-bounce">{overlayData.emoji}</span>
-                        <div className="flex-1">
-                          <p className="text-xs font-black text-white flex justify-between leading-none">
-                            <span>R$ {overlayData.value.toFixed(2)}</span>
-                            <button onClick={() => setShowOverlay(false)} className="text-zinc-500 text-[10px]">✕</button>
-                          </p>
-                          <p className="text-[10px] text-zinc-400 mt-1 font-mono">
-                            {overlayData.distance}km • {overlayData.duration}min
-                          </p>
-                          <div className="text-[11px] font-bold text-amber-400 mt-1">
-                            R$ {overlayData.valuePerKm.toFixed(2)}/km • R${overlayData.valuePerHour.toFixed(0)}/h
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeRide && (
-                    <div className="absolute bottom-1.5 left-2 right-2 bg-zinc-900 rounded-2xl p-3 border border-zinc-800 shadow-2xl flex flex-col gap-1.5">
-                      <div className="flex justify-between items-center text-xs">
-                        <div>
-                          <span className="text-[8px] font-black bg-[#FF5500]/10 text-[#FF5500] px-1.5 py-0.5 rounded">99Pop</span>
-                          <span className="font-black text-white ml-1.5">R$ {activeRide.value.toFixed(2)}</span>
-                        </div>
-                        <span className="text-[10px] text-zinc-400">{activeRide.distance}km • {activeRide.duration}m</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 mt-1">
-                        <button onClick={() => { setActiveRide(null); setShowOverlay(false); }} className="bg-zinc-800 text-zinc-400 text-[10px] py-1.5 rounded-xl font-bold">Recusar</button>
-                        <button onClick={() => { alert("Simulado: Chamada aceita no telefone!"); setActiveRide(null); setShowOverlay(false); }} className="bg-amber-400 text-black text-[10px] py-1.5 rounded-xl font-black">Aceitar</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Presets and custom text triggers below */}
-              <div className="bg-zinc-900/60 p-4 border border-zinc-850 rounded-3xl flex flex-col gap-2.5">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider pl-1">Escolha um preset:</span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {ridePresets.slice(0, 4).map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => handleSelectPreset(p)}
-                      className={`text-[10px] p-2.5 rounded-xl border text-left truncate transition cursor-pointer ${
-                        activeRide?.id === p.id ? "bg-amber-500/10 border-amber-500/40 text-amber-400 font-bold" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                      }`}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-zinc-905 p-4 border border-zinc-850 rounded-3xl flex flex-col gap-2">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider pl-1">Passe um texto do app da 99:</span>
-                <textarea
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="Se copiar logs de corrida no zap de outros motoristas cole aqui..."
-                  rows={2}
-                  className="text-xs p-3 bg-zinc-950 border border-zinc-850 rounded-xl font-mono text-zinc-200 resize-none focus:outline-hidden"
-                />
-                <button
-                  onClick={handleProcessCustomText}
-                  className="w-full bg-amber-500 text-black hover:bg-amber-600 text-xs font-black py-2.5 rounded-xl transition cursor-pointer select-none"
-                >
-                  ANALISAR TEXTO
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* CÓDIGO FONTE KOTLIN (CODE TAB) */}
-          {apkTab === "code" && (
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-4 h-[calc(100vh-180px)] overflow-hidden">
-              <div className="flex justify-between items-center border-b border-zinc-900 pb-2.5 shrink-0">
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Code size={14} className="text-amber-500" />
-                  <span>Código de Acessibilidade Kotlin</span>
-                </h4>
-                <button
-                  onClick={handleCopyCode}
-                  className={`text-[10px] py-1 px-3 rounded-xl font-black transition cursor-pointer ${
-                    copiedFileId ? "bg-green-500/10 text-green-400" : "bg-white text-black"
-                  }`}
-                >
-                  {copiedFileId ? "Copiado!" : "Copiar"}
-                </button>
-              </div>
-
-              <div className="shrink-0 flex flex-col gap-1.5">
-                <select
-                  value={selectedFile.name}
-                  onChange={(e) => {
-                    const chosen = androidFiles.find(f => f.name === e.target.value);
-                    if (chosen) setSelectedFile(chosen);
-                  }}
-                  className="w-full p-2.5 bg-zinc-900 border border-zinc-850 rounded-xl text-xs font-bold text-amber-500 cursor-pointer"
-                >
-                  {androidFiles.map((file) => (
-                    <option key={file.name} value={file.name} className="font-mono text-xs text-zinc-350 bg-zinc-955">
-                      {file.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="bg-zinc-900/40 p-3 rounded-2xl text-[10px] text-zinc-500 shrink-0 select-none">
-                <p className="font-semibold text-zinc-400">{selectedFile.path}</p>
-                <p className="mt-1">{selectedFile.description}</p>
-              </div>
-
-              <div className="flex-1 overflow-auto p-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl font-mono text-[9px] select-text">
-                <div className="table min-w-full">
-                  {renderCodeSnippet(selectedFile.content)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* AJUDA (HELP TAB) */}
-          {apkTab === "help" && (
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-4">
-              <div className="bg-zinc-900/60 p-5 border border-zinc-850 rounded-3xl flex flex-col gap-4 text-xs text-zinc-350 leading-relaxed shadow-lg">
-                <div>
-                  <h4 className="font-black text-amber-500 text-sm flex items-center gap-1.5 mb-1.5">🚀 Como rastrear o App 99 real de verdade?</h4>
-                  <p>
-                    Ferramentas de converter sites em APK (como o FrankWebStudio WebView wrapper) criam apenas uma casca de navegador. <br /><br />
-                    Para o sistema **interceptar de verdade** a tela do app da 99 e rodar por cima de tudo em formato de faturamento automático, você precisa criar o seu app nativo em Kotlin usando o <strong>Android Studio</strong> no seu computador. Os 10 códigos-fonte necessários estão completamente criados e organizados na aba <strong>Código</strong>!
-                  </p>
-                </div>
-                
-                <div className="border-t border-zinc-850/60 pt-4">
-                  <h4 className="font-black text-white text-xs mb-2">Instruções para o Android Studio:</h4>
-                  <ol className="list-decimal pl-4 flex flex-col gap-1.5 text-zinc-400 text-[11px]">
-                    <li>Inicie um projeto livre no Android Studio (Empty Views Activity - Kotlin);</li>
-                    <li>Defina o ID do pacote como <code>com.gigu.clone99</code>;</li>
-                    <li>Copie o código de cada arquivo listado na aba <strong>Código</strong> para o respectivo local indicado pelas tarjas de caminho do arquivo;</li>
-                    <li>Clique em <strong>Build &gt; Build APK(s)</strong> no menu superior para gerar o `.apk` real e instale no celular!</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* BOTTOM NAV BAR */}
-        <div className="fixed bottom-0 left-0 right-0 bg-zinc-950 border-t border-zinc-900 py-3.5 px-4 z-50 flex justify-around items-center select-none shadow-2xl">
-          <button onClick={() => setApkTab("dashboard")} className={`flex flex-col items-center gap-1 transition-all ${apkTab === "dashboard" ? "text-amber-400 scale-110" : "text-zinc-500"}`}>
-            <Sliders size={16} />
-            <span className="text-[9px] font-extrabold uppercase select-none leading-none mt-0.5">Painel</span>
-          </button>
-          <button onClick={() => setApkTab("settings")} className={`flex flex-col items-center gap-1 transition-all ${apkTab === "settings" ? "text-amber-400 scale-110" : "text-zinc-500"}`}>
-            <Settings size={16} />
-            <span className="text-[9px] font-extrabold uppercase select-none leading-none mt-0.5">Metas</span>
-          </button>
-          <button onClick={() => setApkTab("simulator")} className={`flex flex-col items-center gap-1 transition-all ${apkTab === "simulator" ? "text-amber-400 scale-110" : "text-zinc-500"}`}>
-            <Smartphone size={16} />
-            <span className="text-[9px] font-extrabold uppercase select-none leading-none mt-0.5">Simu</span>
-          </button>
-          <button onClick={() => setApkTab("code")} className={`flex flex-col items-center gap-1 transition-all ${apkTab === "code" ? "text-amber-400 scale-110" : "text-zinc-500"}`}>
-            <FileCode size={16} />
-            <span className="text-[9px] font-extrabold uppercase select-none leading-none mt-0.5">Código</span>
-          </button>
-          <button onClick={() => setApkTab("help")} className={`flex flex-col items-center gap-1 transition-all ${apkTab === "help" ? "text-amber-400 scale-110" : "text-zinc-500"}`}>
-            <HelpCircle size={16} />
-            <span className="text-[9px] font-extrabold uppercase select-none leading-none mt-0.5">Ajuda</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 antialiased flex flex-col selection:bg-amber-400 selection:text-slate-950 relative overflow-x-hidden">
       
-      {/* HEADER PRINCIPAL DO SYSTEM ADAPTIVE HUB */}
-      <header className="bg-zinc-950/80 border-b border-zinc-900 backdrop-blur-md sticky top-0 z-40 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                99 GigU Clone Hub
-                <span className="text-amber-500 font-light text-xs uppercase tracking-widest ml-2">Android Pro v2.4</span>
-              </h1>
-              <p className="text-xs text-zinc-500 leading-normal">
-                Simulador de Acessibilidade e Gerador de Código Inteligente para motoristas de aplicativos
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 w-full md:w-auto flex-wrap justify-end">
-            {/* Seletor de Modo de Visualização */}
-            <div className="flex bg-zinc-900 border border-zinc-800 p-0.5 rounded-2xl shrink-0">
-              <button
-                onClick={() => setViewMode("combo")}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer select-none ${
-                  viewMode === "combo" ? "bg-amber-500 text-black shadow-lg" : "text-zinc-400 hover:text-white"
-                }`}
+      {/* Background Ambience */}
+      <div className="absolute inset-x-0 top-0 -z-10 h-[600px] bg-gradient-to-b from-amber-500/10 via-slate-950/0 to-slate-950/0 pointer-events-none" />
+
+      {/* Floating Interactive Draggable Overlay Simulator */}
+      {showOverlay && (
+        <motion.div
+          drag
+          dragMomentum={false}
+          initial={{ x: window.innerWidth > 1024 ? 800 : 20, y: 140 }}
+          className="fixed z-50 p-[1px] rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500/50 to-slate-800 shadow-2xl cursor-grab active:cursor-grabbing w-72 backdrop-blur-md"
+        >
+          <div className="bg-slate-950/90 rounded-[15px] p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl animate-pulse">🚦</span>
+                <div>
+                  <h4 className="text-xs font-black text-amber-450 uppercase tracking-tight">99 Copilot Overlay</h4>
+                  <p className="text-[7.5px] text-slate-400 font-mono">Permissão SYSTEM_ALERT_WINDOW</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowOverlay(false)}
+                className="p-1 hover:text-rose-400 text-slate-500 rounded-lg hover:bg-slate-900 cursor-pointer"
               >
-                <Layers size={11} />
-                <span>Modo PC</span>
-              </button>
-              <button
-                onClick={() => setViewMode("apk")}
-                className={`px-3 py-1.5 text-xs font-black rounded-xl transition flex items-center gap-1.5 cursor-pointer select-none ${
-                  viewMode === "apk" ? "bg-amber-500 text-black shadow-lg" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                <Smartphone size={11} />
-                <span>Modo APK (Mobile)</span>
+                <X size={14} />
               </button>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-full">
-              <div className={`w-2 h-2 rounded-full ${accessibilityPermitted && overlayPermitted ? "bg-green-500 animate-pulse" : "bg-red-500"}`}></div>
-              <span className="text-[11px] font-semibold text-zinc-300">
-                {accessibilityPermitted && overlayPermitted ? "SERVIÇO ATIVO" : "SERVIÇO INATIVO"}
+            {/* Simulated Live Offer data container */}
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-1 shrink-0">
+                {canAnalyzeComp 
+                  ? calculatedScore >= 75 ? "🟢" : calculatedScore >= 50 ? "🟡" : "🔴"
+                  : "⚪"
+                }
               </span>
+              <div className="flex-grow flex flex-col">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-lg font-black text-white font-mono">
+                    {canAnalyzeComp ? `R$ ${valNum.toFixed(2)}` : "Aguardando..."}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {canAnalyzeComp ? `${distNum} km` : ""}
+                  </span>
+                </div>
+                {canAnalyzeComp && (
+                  <p className="text-[9.5px] text-slate-400 mt-0.5 font-medium leading-none">
+                    Destino: {inputRegion}
+                  </p>
+                )}
+                
+                {/* Score badge & fuel calculation inside draggable overlay */}
+                {canAnalyzeComp ? (
+                  <div className="flex flex-col gap-1.5 mt-2.5 pt-2 border-t border-slate-900/60">
+                    <div className="flex justify-between items-center bg-slate-900/60 rounded-lg px-2 py-1 border border-slate-800">
+                      <span className="text-[9px] font-bold text-slate-400">PONTUAÇÃO CO-PILOTO</span>
+                      <span className="text-[10px] font-extrabold text-amber-400 font-mono">
+                        {calculatedScore}/100
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 text-center text-[8.5px]">
+                      <div className="bg-slate-905 p-1 rounded border border-slate-900">
+                        <span className="text-slate-500 block">R$/KM FINAL</span>
+                        <span className="font-extrabold font-mono text-slate-200">R$ {rPerKm.toFixed(2)}/km</span>
+                      </div>
+                      <div className="bg-slate-905 p-1 rounded border border-slate-900">
+                        <span className="text-slate-500 block">LUCRO ESTIMADO</span>
+                        <span className="font-extrabold font-mono text-emerald-400">R$ {netProfit.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    <p className={`text-[9px] font-bold text-center mt-1 uppercase ${
+                      calculatedScore >= 75 ? "text-emerald-400" : calculatedScore >= 50 ? "text-amber-400" : "text-rose-400"
+                    }`}>
+                      {calculatedScore >= 75 ? "💡 ACEITAR DE IMEDIATO" : calculatedScore >= 50 ? "🔔 DETALHES OK. ANALISE" : "❌ RECUSAR. DÁ PREJUÍZO!"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[9.5px] text-slate-500 leading-normal mt-1.5">
+                    Digite valores no smartphone ao lado ou simule OCR da mala direta para disparar o cálculo do overlay !
+                  </p>
+                )}
+              </div>
             </div>
-            
-            <a 
-              href="#instructions" 
-              className="bg-white text-black px-6 py-2.5 rounded-full text-xs font-black shadow-xl hover:bg-zinc-100 transition whitespace-nowrap"
+
+            <div className="text-[7.5px] text-center text-slate-500 border-t border-slate-900/40 pt-1.5 select-none uppercase tracking-wider font-mono">
+              🖱️ Arraste-me para qualquer lugar da tela
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Main Companion Header */}
+      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-450 text-slate-950 font-black text-xl flex items-center justify-center shadow-lg shadow-amber-450/20">
+              99
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                99 Copilot Assistant
+                <span className="text-[10px] bg-amber-450/15 text-amber-300 font-extrabold px-2 py-0.5 rounded-full border border-amber-400/20">
+                  Nativo Android (Kotlin)
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400">Simulador de tela flutuante, leitura local OCR e painel de controle MVVM</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+            <button
+              onClick={() => setShowOverlay(!showOverlay)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-bold transition duration-200 cursor-pointer ${
+                showOverlay 
+                  ? "bg-amber-400/10 border-amber-400/40 text-amber-300" 
+                  : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+              }`}
             >
-              GUIA COMPLETO
-            </a>
+              <Layout size={13} />
+              <span>{showOverlay ? "Ocultar Overlay" : "Exibir Overlay Flutuante"}</span>
+            </button>
+            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-full text-xs text-slate-400 select-none shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Room SQLite Ativo</span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* DASHBOARD PRINCIPAL */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+      {/* Main Grid Interface */}
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow">
         
-        {/* COLUNA ESQUERDA: SIMULADOR DE SMARTPHONE (4 COLUNAS) */}
-        <section className="lg:col-span-5 flex flex-col items-center">
+        {/* Left column (7 Columns on desktop): Features list, explanation of native code downloads */}
+        <section className="lg:col-span-7 flex flex-col gap-6">
           
-          {/* BOTÕES DE NAVEGAÇÃO DE TELA DO SMARTPHONE */}
-          <div className="w-full max-w-[340px] mb-4 bg-zinc-900/50 p-1.5 rounded-full border border-zinc-850 flex gap-1">
-            <button
-              onClick={() => { setPhoneScreen("gigu_dashboard"); setActiveRide(null); setShowOverlay(false); }}
-              className={`flex-1 py-2 px-1 text-center font-bold text-xs rounded-full transition-all cursor-pointer ${
-                phoneScreen === "gigu_dashboard" || phoneScreen === "gigu_settings"
-                  ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-900/60"
-              }`}
-            >
-              App GigU Clone
-            </button>
-            <button
-              onClick={() => { setPhoneScreen("app_99"); setActiveRide(null); setShowOverlay(false); }}
-              className={`flex-1 py-2 px-1 text-center font-bold text-xs rounded-full transition-all cursor-pointer ${
-                phoneScreen === "app_99"
-                  ? "bg-white text-black shadow-lg"
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-900/60"
-              }`}
-            >
-              App da 99 (Simulado)
-            </button>
+          {/* Main explanation card */}
+          <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-6 relative overflow-hidden backdrop-blur-xs">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
+            
+            <span className="text-[9.5px] font-extrabold text-amber-450 uppercase tracking-widest bg-amber-400/10 border border-amber-450/20 rounded-full px-2.5 py-1 inline-block mb-3.5 leading-none">
+              Inovação para Motoristas Parceiros 🇧🇷
+            </span>
+            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">
+              Analisador de Viagens Instantâneo e Autônomo
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              O <strong>99 Copilot</strong> é um assistente completo desenvolvido em Kotlin nativo para Android. Ele usa canais de <strong>Acessibilidade</strong> no Android para ler instantaneamente o valor das ofertas que entram no dispositivo da 99, calculando ganho por km, custo do combustível e faturamento líquido real para dar ao motorista uma recomendação segura em forma de semáforo.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-6">
+              <div className="bg-slate-950/70 border border-slate-900/80 p-3.5 rounded-xl flex items-start gap-2.5">
+                <span className="text-emerald-400 text-xl">🟢</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-200">Excellent Grade</h4>
+                  <p className="text-[10px] text-slate-450 mt-1">Gera nota maior que 75. Excelente faturamento líquido. Aceite sem medo.</p>
+                </div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-900/80 p-3.5 rounded-xl flex items-start gap-2.5">
+                <span className="text-amber-400 text-xl">🟡</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-200">Acceptable Grade</h4>
+                  <p className="text-[10px] text-slate-450 mt-1">Entre meta amarela e verde. Razoável. O motorista decide com base no trânsito.</p>
+                </div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-900/80 p-3.5 rounded-xl flex items-start gap-2.5">
+                <span className="text-rose-400 text-xl">🔴</span>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-200">Unrecommended</h4>
+                  <p className="text-[10px] text-slate-450 mt-1">Dá prejuízo após descontar despesas de combustível por litro. Recuse.</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* TELEFONE INTERATIVO MOCKUP */}
-          <div 
-            ref={phoneScreenRef}
-            className={`relative w-full max-w-[344px] h-[640px] bg-zinc-950 rounded-[48px] border-[12px] border-zinc-900 shadow-2xl overflow-hidden transition-transform duration-300 ${
-              isVibrating ? "animate-vibrate border-red-500/40" : ""
-            }`}
-          >
-            {/* Notch da Câmera do Celular */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-32 h-6 bg-zinc-900 rounded-full z-50 flex items-center justify-center border border-zinc-800/40">
-              <div className="w-3 h-3 rounded-full bg-zinc-950 border border-zinc-800"></div>
-            </div>
-
-            {/* BARRA DE STATUS DO ANDROID */}
-            <div className="h-9 px-6 pt-2 bg-zinc-950 text-zinc-400 text-[10px] font-mono flex justify-between items-center z-40 select-none border-b border-zinc-900">
-              <span>16:48</span>
-              <div className="flex items-center gap-1.5">
-                <Volume2 size={10} className={isVibrateEnabled ? "text-amber-500" : "text-zinc-650"} />
-                <span className="text-[9px] font-semibold text-zinc-500">5G</span>
-                <span className="border border-zinc-800 rounded px-1.5 py-0.5 text-[8px] leading-none text-zinc-500">82%</span>
+          {/* Native code visualizer companion tabs */}
+          <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-900 gap-3 mb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <FileCode size={18} className="text-amber-450" />
+                  Visualizador de Scripts Nativos (NFC/Room)
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-1">Veja a lógica real em Kotlin utilizada no projeto do Android Studio</p>
+              </div>
+              
+              <div className="flex items-center gap-1.5 self-stretch sm:self-auto overflow-x-auto">
+                {androidFiles.map((f, i) => (
+                  <button
+                    key={f.name}
+                    onClick={() => setSelectedFileIndex(i)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap cursor-pointer ${
+                      selectedFileIndex === i
+                        ? "bg-amber-400 text-slate-950 font-bold"
+                        : "bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800"
+                    }`}
+                  >
+                    {f.name}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* CONTEÚDO DAS TELAS DO TELEFONE */}
-            <div className="relative h-[calc(100%-36px)] bg-zinc-950 text-zinc-200 overflow-y-auto">
-              
-              {/* SCREEN CARD: GIGU CLONE APP - DASHBOARD */}
-              {phoneScreen === "gigu_dashboard" && (
-                <div className="p-4 flex flex-col gap-4 bg-zinc-950 min-h-full font-sans">
-                  
-                  {/* Header do App dentro do Android */}
-                  <div className="flex items-center gap-2 pb-2 border-b border-zinc-900">
-                    <span className="text-2xl">🚦</span>
-                    <div>
-                      <h3 className="font-bold text-sm text-white leading-tight">99 Ride Analyzer</h3>
-                      <p className="text-[10px] text-zinc-500 font-mono">Compartimentado GigU</p>
-                    </div>
-                  </div>
+            <div className="flex flex-col gap-3">
+              <div className="bg-slate-950/50 rounded-xl p-3 border border-slate-900 text-[11px] text-slate-350 leading-relaxed">
+                <strong>Localização:</strong> <span className="font-mono text-amber-300 text-[10px]">{androidFiles[selectedFileIndex].path}</span>
+                <p className="mt-1 text-slate-400 font-medium">{androidFiles[selectedFileIndex].description}</p>
+              </div>
 
-                  {/* Estado do Serviço no Android */}
-                  <div className="bg-zinc-900/65 border border-zinc-800/80 p-4 rounded-3xl shadow-md">
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Status do Serviço</p>
-                    <div className="flex items-center justify-between mt-2.5">
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-                        accessibilityPermitted && overlayPermitted
-                          ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                          : "bg-red-500/10 text-red-400 border border-red-500/20"
-                      }`}>
-                        {accessibilityPermitted && overlayPermitted ? "● ATIVO (Monitorando)" : "● INATIVO"}
-                      </span>
-                      
-                      <div className="bg-zinc-950 px-2.5 py-1 rounded-lg text-[9px] font-mono text-zinc-400 border border-zinc-800 font-semibold">
-                        Service Ativo
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ativação de Permissões Críticas */}
-                  <div className="bg-zinc-900/65 border border-zinc-800/80 p-4 rounded-3xl shadow-md flex flex-col gap-2.5">
-                    <h4 className="font-bold text-xs text-zinc-200 flex items-center gap-1.5">
-                      <ShieldAlert size={14} className="text-amber-500" />
-                      Permissões Necessárias
-                    </h4>
-                    <p className="text-[11px] text-zinc-450 leading-relaxed">
-                      Requerido para interceptar a tela da 99 Driver e renderizar os sinais do Semáforo.
-                    </p>
-
-                    <button
-                      onClick={() => setAccessibilityPermitted(!accessibilityPermitted)}
-                      className={`w-full py-2.5 px-3 rounded-2xl text-xs font-semibold flex items-center justify-between border transition cursor-pointer select-none ${
-                        accessibilityPermitted 
-                          ? "bg-zinc-900 border-green-500/30 text-green-400 hover:bg-zinc-900/80" 
-                          : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-800"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <div className={`w-1.5 h-1.5 rounded-full ${accessibilityPermitted ? "bg-green-500 animate-pulse" : "bg-zinc-600"}`}></div>
-                        <span>Acessibilidade</span>
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-950 border border-zinc-850">
-                        {accessibilityPermitted ? "Ativado" : "Permitir"}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setOverlayPermitted(!overlayPermitted)}
-                      className={`w-full py-2.5 px-3 rounded-2xl text-xs font-semibold flex items-center justify-between border transition cursor-pointer select-none ${
-                        overlayPermitted 
-                          ? "bg-zinc-900 border-green-500/30 text-green-400 hover:bg-zinc-900/80" 
-                          : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-800"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <div className={`w-1.5 h-1.5 rounded-full ${overlayPermitted ? "bg-green-500 animate-pulse" : "bg-zinc-600"}`}></div>
-                        <span>Janela Flutuante</span>
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-950 border border-zinc-850">
-                        {overlayPermitted ? "Permitido" : "Permitir"}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Metas Atuais no Celular */}
-                  <div className="bg-zinc-900/65 border border-zinc-800/80 p-4 rounded-3xl shadow-md">
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-bold text-xs text-zinc-200 flex items-center gap-1.5">
-                        <Sliders size={13} className="text-amber-500" />
-                        Metas de Ganhos
-                      </h4>
-                      <button
-                        onClick={() => setPhoneScreen("gigu_settings")}
-                        className="text-[11px] font-bold text-amber-500 hover:text-amber-400 transition"
-                      >
-                        Configurar
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-zinc-950 p-2.5 rounded-2xl text-center border border-zinc-850">
-                        <p className="text-[9px] text-zinc-500 mb-0.5">🟢 Excelente</p>
-                        <p className="text-xs font-bold font-mono text-green-400">≥ R${minKmGood.toFixed(1)}/k</p>
-                      </div>
-                      <div className="bg-zinc-950 p-2.5 rounded-2xl text-center border border-zinc-850">
-                        <p className="text-[9px] text-zinc-500 mb-0.5">🟡 Aceitável</p>
-                        <p className="text-xs font-bold font-mono text-yellow-500">≥ R${minKmMedium.toFixed(1)}/k</p>
-                      </div>
-                      <div className="bg-zinc-950 p-2.5 rounded-2xl text-center border border-zinc-850">
-                        <p className="text-[9px] text-zinc-500 mb-0.5">⏱️ Ganhos/h</p>
-                        <p className="text-xs font-bold font-mono text-zinc-100">≥ R${minHour.toFixed(0)}/h</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Switch do Overlay principal */}
-                  <div className="bg-zinc-900/65 border border-zinc-800/80 p-4 rounded-3xl shadow-sm flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-xs text-zinc-200">Ativar Overlay</h4>
-                      <p className="text-[10px] text-zinc-500">Mostra o semáforo na tela</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        checked={isOverlayEnabled}
-                        onChange={() => setIsOverlayEnabled(!isOverlayEnabled)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-6 bg-zinc-800 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-zinc-950 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-zinc-300 after:border-zinc-400 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-black peer-checked:after:border-black"></div>
-                    </label>
-                  </div>
-
-                  {/* Informações adicionais do motorista */}
-                  <div className="bg-amber-500/5 p-4 rounded-3xl border border-amber-500/10 text-[11px] text-zinc-400 leading-relaxed flex gap-2.5">
-                    <Info size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-amber-500">Nota de Segurança:</p>
-                      O GigU não realiza gestos nem aceita corridas de forma automática. Opera puramente em modo passivo, garantindo total conformidade legal contra bloqueios.
-                    </div>
-                  </div>
-
+              {/* Native view code snippet */}
+              <div className="relative rounded-2xl border border-slate-900 bg-slate-950 overflow-hidden group">
+                <button
+                  onClick={() => handleCopyFilesSource(selectedFileIndex, androidFiles[selectedFileIndex].content)}
+                  className="absolute top-3 right-3 bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-[9px] font-bold tracking-wider flex items-center gap-1.5 transition uppercase hover:scale-101 cursor-pointer"
+                >
+                  {copiedIndex === selectedFileIndex ? (
+                    <>
+                      <CheckCircle size={10} className="text-emerald-400" />
+                      COPIADO!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={10} />
+                      COPIAR
+                    </>
+                  )}
+                </button>
+                <div className="p-5 font-mono text-[10px] text-slate-400 max-h-[380px] overflow-y-auto select-text scrollbar-thin leading-relaxed">
+                  <pre className="whitespace-pre">{androidFiles[selectedFileIndex].content}</pre>
                 </div>
-              )}
-
-              {/* SCREEN CARD: GIGU CLONE APP - SETTINGS CONTAINER */}
-              {phoneScreen === "gigu_settings" && (
-                <div className="p-4 flex flex-col gap-4 bg-zinc-950 min-h-full font-sans">
-                  
-                  <div className="flex items-center gap-2 pb-2 border-b border-zinc-900">
-                    <button 
-                      onClick={() => setPhoneScreen("gigu_dashboard")}
-                      className="text-xs text-amber-500 font-bold hover:underline"
-                    >
-                      ← Voltar
-                    </button>
-                    <h3 className="font-bold text-sm text-white">Configurar Metas</h3>
-                  </div>
-
-                  <div className="bg-zinc-900/65 border border-zinc-805 p-4 rounded-3xl shadow-md flex flex-col gap-4">
-                    
-                    {/* Input excelente */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">
-                        Excelente (🟢 Verde) - R$/km
-                      </label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tempKmGood}
-                        onChange={(e) => setTempKmGood(e.target.value)}
-                        className="w-full text-sm p-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-white focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-mono"
-                        placeholder="Ex: 3.0"
-                      />
-                    </div>
-
-                    {/* Input intermediario */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">
-                        Aceitável (🟡 Amarelo) - R$/km
-                      </label>
-                      <input 
-                        type="number" 
-                        step="0.1"
-                        value={tempKmMedium}
-                        onChange={(e) => setTempKmMedium(e.target.value)}
-                        className="w-full text-sm p-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-white focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-mono"
-                        placeholder="Ex: 2.0"
-                      />
-                    </div>
-
-                    {/* Input faturamento por hora */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-zinc-400 mb-1.5 uppercase tracking-wider">
-                        Faturamento mínimo por hora (R$/h)
-                      </label>
-                      <input 
-                        type="number" 
-                        step="5"
-                        value={tempHour}
-                        onChange={(e) => setTempHour(e.target.value)}
-                        className="w-full text-sm p-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-white focus:outline-hidden focus:ring-1 focus:ring-amber-500 font-mono"
-                        placeholder="Ex: 50.0"
-                      />
-                    </div>
-
-                    {/* Checkbox vibração */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-zinc-900">
-                      <input 
-                        type="checkbox" 
-                        id="checkVibrate"
-                        checked={isVibrateEnabled}
-                        onChange={() => setIsVibrateEnabled(!isVibrateEnabled)}
-                        className="rounded border-zinc-800 bg-zinc-950 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
-                      />
-                      <label htmlFor="checkVibrate" className="text-xs font-semibold text-zinc-300 cursor-pointer select-none">
-                        Vibrar ao receber nova corrida
-                      </label>
-                    </div>
-
-                    <button
-                      onClick={handleSaveSettings}
-                      className="w-full mt-2 bg-amber-500 text-black font-black py-3 rounded-2xl text-xs hover:bg-amber-600 transition shadow-lg shadow-amber-500/10 cursor-pointer select-none"
-                    >
-                      SALVAR METAS
-                    </button>
-                  </div>
-
-                </div>
-              )}
-
-              {/* SCREEN CARD: 99 APP SIMULATOR */}
-              {phoneScreen === "app_99" && (
-                <div className="relative h-full bg-zinc-950 text-zinc-100 flex flex-col font-sans select-none border-t border-zinc-900">
-                  
-                  {/* Banner do topo do Aplicativo da 99 */}
-                  <div className="bg-[#FF5500] text-slate-950 px-4 py-2.5 flex items-center justify-between shadow-md">
-                    <span className="font-extrabold text-[10px] tracking-wider uppercase">99 Driver PRO</span>
-                    <span className="text-[9px] bg-white px-2 py-0.5 rounded-full font-black border border-black/10">ONLINE</span>
-                  </div>
-
-                  {/* MAPA SIMULADO EM BACKGROUND */}
-                  <div className="flex-1 relative overflow-hidden bg-[#18181b] flex items-center justify-center p-4">
-                    {/* Desenho do mapa simulado usando gradientes e divs CSS */}
-                    <div className="absolute inset-0 opacity-15 pointer-events-none">
-                      <div className="absolute w-[1px] h-full bg-zinc-700 left-1/3"></div>
-                      <div className="absolute w-[1px] h-full bg-zinc-700 left-2/3"></div>
-                      <div className="absolute h-[1px] w-full bg-zinc-700 top-1/4"></div>
-                      <div className="absolute h-[1px] w-full bg-zinc-700 top-3/4"></div>
-                      <div className="absolute h-[1px] w-full bg-zinc-700 top-1/2 rotate-45 scale-150"></div>
-                    </div>
-
-                    {/* Ícone sutil de localização GPS */}
-                    <div className="z-10 flex flex-col items-center">
-                      <Compass className="text-amber-500 animate-spin" size={32} style={{ animationDuration: '6s' }} />
-                      <span className="text-[10px] text-zinc-500 mt-1.5 font-mono">Simulador Ativo</span>
-                    </div>
-
-                    {/* OFERTA DE CORRIDA 99 DA TELA */}
-                    {activeRide && (
-                      <div className="absolute bottom-2 left-2 right-2 bg-zinc-900 text-zinc-100 rounded-3xl p-4 shadow-2xl border border-zinc-800 z-20 flex flex-col gap-2.5">
-                        
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="text-[8px] font-black bg-[#FF5500]/20 text-[#FF5500] px-2 py-0.5 rounded-full border border-[#FF5500]/35 uppercase font-mono">
-                              99Pop Viagem
-                            </span>
-                            <div className="text-xl font-black text-white leading-none mt-2">
-                              R$ {activeRide.value.toFixed(2).replace(".", ",")}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs font-bold text-zinc-100">{activeRide.distance} km</p>
-                            <p className="text-[10px] text-zinc-400 font-medium">{activeRide.duration} min</p>
-                          </div>
-                        </div>
-
-                        {/* Rota (Origem/Destino) */}
-                        <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-850 flex flex-col gap-2">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 shadow-sm shadow-blue-500/50"></span>
-                            <p className="text-[10px] text-zinc-350 font-bold truncate">A: {activeRide.origin}</p>
-                          </div>
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 shadow-sm shadow-emerald-500/50"></span>
-                            <p className="text-[10px] text-zinc-350 font-bold truncate font-sans">B: {activeRide.destination}</p>
-                          </div>
-                        </div>
-
-                        {/* Botão Oficial sem cliques automáticos */}
-                        <div className="grid grid-cols-2 gap-2 mt-1">
-                          <button 
-                            onClick={() => { setActiveRide(null); setShowOverlay(false); }}
-                            className="bg-zinc-800 hover:bg-zinc-700/80 text-zinc-300 font-bold py-2.5 rounded-2xl text-xs transition border border-zinc-700/50 cursor-pointer select-none"
-                          >
-                            Recusar
-                          </button>
-                          <button 
-                            onClick={() => { alert("Simulação: Viagem Aceita pelo Motorista manualmente!"); setActiveRide(null); setShowOverlay(false); }}
-                            className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black py-2.5 rounded-2xl text-xs transition cursor-pointer select-none"
-                          >
-                            Aceitar
-                          </button>
-                        </div>
-
-                      </div>
-                    )}
-
-                    {/* Caso não tenha nenhuma corrida rodando, mostrar instrução para disparar */}
-                    {!activeRide && (
-                      <div className="absolute inset-0 bg-zinc-950/85 p-6 flex flex-col justify-center items-center text-center z-10">
-                        <span className="text-3xl mb-3 animate-pulse">📲</span>
-                        <h4 className="font-bold text-sm text-white">Nenhuma corrida ativa</h4>
-                        <p className="text-[11px] text-zinc-500 mt-1.5 max-w-[200px] leading-relaxed">
-                          Escolha um dos presets abaixo do telefone para injetar uma corrida simulada na tela da 99!
-                        </p>
-                      </div>
-                    )}
-
-                  </div>
-
-                </div>
-              )}
-
-              {/* OVERLAY SEMÁFORO FLUTUANTE DA GIGU (GIGU OVERLAY) EM OUTROS APPS */}
-              <AnimatePresence>
-                {showOverlay && overlayData && (
-                  <motion.div
-                    drag
-                    dragConstraints={phoneScreenRef}
-                    dragElastic={0.1}
-                    dragMomentum={false}
-                    initial={{ opacity: 0, scale: 0.85, y: 15 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className={`absolute z-50 top-18 left-4 right-4 pointer-events-auto rounded-3xl p-4 shadow-2xl border cursor-grab active:cursor-grabbing bg-zinc-900 border-zinc-800 ${
-                      overlayData.classification === "GOOD"
-                        ? "shadow-green-500/5 ring-1 ring-green-500/20"
-                        : overlayData.classification === "MEDIUM"
-                        ? "shadow-yellow-500/5 ring-1 ring-yellow-500/20"
-                        : "shadow-red-500/5 ring-1 ring-red-500/20"
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      
-                      {/* Emoji do Semáforo */}
-                      <div className="self-center flex flex-col items-center">
-                        <span className="text-3.5xl select-none leading-none animate-bounce" style={{ animationDuration: '2s' }}>
-                          {overlayData.emoji}
-                        </span>
-                        
-                        {/* Indicador visual de faturamento */}
-                        <span className={`text-[8px] font-mono font-extrabold mt-2 tracking-widest uppercase px-2 py-0.5 rounded-full ${
-                          overlayData.classification === "GOOD"
-                            ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                            : overlayData.classification === "MEDIUM"
-                            ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
-                        }`}>
-                          {overlayData.classification}
-                        </span>
-                      </div>
-
-                      {/* Métricas formatadas e calculadas */}
-                      <div className="flex-1 flex flex-col gap-0.5">
-                        <div className="text-base font-black text-white flex justify-between items-center leading-tight">
-                          <span>R$ {overlayData.value.toFixed(2).replace(".", ",")}</span>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setShowOverlay(false); }}
-                            className="p-1 hover:bg-zinc-800/80 rounded-full transition cursor-pointer"
-                          >
-                            <X size={12} className="text-zinc-500 hover:text-white" />
-                          </button>
-                        </div>
-                        
-                        <p className="text-[10px] text-zinc-400 font-mono">
-                          {overlayData.distance} km • {overlayData.duration} min
-                        </p>
-
-                        <div className="mt-2 flex flex-col text-[12px] font-bold">
-                          <span className={`${
-                            overlayData.classification === "GOOD" 
-                              ? "text-green-400" 
-                              : overlayData.classification === "MEDIUM" 
-                              ? "text-yellow-500" 
-                              : "text-red-400"
-                          }`}>
-                            R$ {overlayData.valuePerKm.toFixed(2).replace(".", ",")} / km
-                          </span>
-                          <span className="text-zinc-500 text-[11px] font-medium font-mono">
-                            R$ {overlayData.valuePerHour.toFixed(0)} / hora
-                          </span>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* Progress Bar de Contagem Regressiva Visual de 5s */}
-                    <div className="w-full bg-zinc-950 h-1 rounded-full mt-3 overflow-hidden border border-zinc-900">
-                      <div 
-                        className={`h-full transition-all ${
-                          overlayData.classification === "GOOD"
-                            ? "bg-green-500"
-                            : overlayData.classification === "MEDIUM"
-                            ? "bg-yellow-500"
-                            : "bg-red-500"
-                        }`}
-                        style={{ width: `${(timeLeft / 5) * 100}%` }}
-                      ></div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
+              </div>
             </div>
-
           </div>
 
-          {/* PAINEL DE DISPARO DE CORRIDAS (CONTROLES DO SIMULADOR) */}
-          <div className="w-full max-w-[340px] mt-4 flex flex-col gap-3.5 bg-zinc-900 border border-zinc-850 p-4 rounded-3xl shadow-sm">
-            
-            <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-2">
-              <span className="text-lg">📲</span>
-              <h4 className="font-bold text-xs text-zinc-200">Disparador de Corridas</h4>
+          {/* Quick installation steps for users */}
+          <div className="bg-slate-900/40 border border-slate-900 rounded-2xl p-6">
+            <h3 className="text-base font-extrabold text-white mb-4 flex items-center gap-2">
+              <Compass size={18} className="text-amber-450" />
+              Diretrizes de Implantação e Recursos Nativos
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-300 leading-relaxed">
+              <div className="bg-slate-950/40 border border-slate-905 p-4 rounded-xl flex flex-col gap-2">
+                <h4 className="font-bold text-slate-100 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Serviço de Acessibilidade 🚦
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  O arquivo <code className="text-amber-300 bg-slate-900 px-1 py-0.5 rounded text-[10px]">AnalysisService.kt</code> implementa o crawler de tela local. Ele lê os layouts do celular procurando strings de preços e distâncias pelo app oficial da 99 sem simular toques, mantendo a integridade de termos de uso.
+                </p>
+              </div>
+
+              <div className="bg-slate-950/40 border border-slate-905 p-4 rounded-xl flex flex-col gap-2">
+                <h4 className="font-bold text-slate-100 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  Vantagens do Banco Offline Room 💾
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  A persistência ocorre instantaneamente no SQLite nativo via Room Database. Sem uso de nuvem ou APIs remotas externas de alto consumo de dados móveis, garantindo estabilidade e baixo nível de bateria mesmo rodando no trânsito.
+                </p>
+              </div>
             </div>
-
-            <p className="text-[11px] text-zinc-500 leading-relaxed">
-              Acione uma corrida pré-definida ou digite um log de texto para ver o overlay computar instantaneamente.
-            </p>
-
-            {/* Grid de Presets */}
-            <div className="grid grid-cols-2 gap-2">
-              {ridePresets.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => handleSelectPreset(preset)}
-                  className={`text-left p-3 rounded-2xl border text-[11px] font-medium transition cursor-pointer select-none ${
-                    activeRide?.id === preset.id
-                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-md shadow-amber-500/5"
-                      : "bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-805"
-                  }`}
-                >
-                  <p className="font-bold text-zinc-200 truncate">{preset.name}</p>
-                  <p className="text-[9px] text-zinc-500 mt-1 font-mono">R$ {preset.value.toFixed(1)} • {preset.distance}km</p>
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Log Text Input */}
-            <div className="flex flex-col gap-1.5 mt-1 border-t border-zinc-800 pb-3">
-              <label className="text-[11px] font-bold text-zinc-400 mt-2">
-                Simular Texto do Aplicativo da 99:
-              </label>
-              <textarea
-                value={customText}
-                onChange={(e) => setCustomText(e.target.value)}
-                placeholder="Exemplo: Corrida enviada valor R$ 18,50, percurso total de 5.2 km com duracao de 15 min..."
-                rows={2}
-                className="w-full text-xs p-3 bg-zinc-950 border border-zinc-850 rounded-2xl text-zinc-100 placeholder:text-zinc-650 focus:outline-hidden focus:border-zinc-800 font-mono resize-none transition"
-              />
-              <button
-                onClick={handleProcessCustomText}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-black text-xs font-black py-2.5 rounded-2xl transition cursor-pointer select-none"
-              >
-                DISPARAR TEXTO PERSONALIZADO
-              </button>
-            </div>
-
           </div>
 
         </section>
 
-        {/* COLUNA DIREITA: EXPLORER AND ANDROID KOTLIN CODE HUB (7 COLUNAS) */}
-        <section className="lg:col-span-7 bg-zinc-900 border border-zinc-850 rounded-3xl overflow-hidden flex flex-col h-[810px] shadow-sm">
+        {/* Right column (5 Columns on desktop): Golden tactile smartphone preview mockup */}
+        <section className="lg:col-span-5 flex flex-col items-center">
           
-          {/* Header do Explorer */}
-          <div className="bg-zinc-900/60 border-b border-zinc-850 px-5 py-3.5 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Code size={18} className="text-amber-500" />
-              <div>
-                <h2 className="font-bold text-sm text-zinc-100 flex items-center gap-1.5 font-sans leading-tight">
-                  Painel de Código Kotlin Android
-                </h2>
-                <p className="text-[10px] text-slate-500 font-mono">
-                  Geração fiel dos arquivos para colar no seu projeto Android Studio
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleCopyCode}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer select-none ${
-                copiedFileId 
-                  ? "bg-green-500/10 border border-green-500/20 text-green-400"
-                  : "bg-white text-black hover:bg-zinc-200"
-              }`}
-            >
-              {copiedFileId ? <Check size={14} className="animate-pulse" /> : <Copy size={14} />}
-              <span>{copiedFileId ? "COPIADO!" : "COPIAR ARQUIVO"}</span>
-            </button>
+          <div className="w-full max-w-[340px] mb-3 text-center lg:text-left flex items-center justify-between">
+            <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+              <Smartphone size={12} className="text-amber-400" />
+              99 Copilot Simulador
+            </span>
+            <span className="text-[9.5px] font-mono text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+              Full Stack Mockup
+            </span>
           </div>
 
-          <div className="flex-1 flex overflow-hidden">
-            
-            {/* Folder Tree Sidebar */}
-            <div className="w-56 bg-zinc-950/40 border-r border-zinc-850 p-3 overflow-y-auto select-none flex flex-col gap-1 shrink-0">
-              <div className="text-[10px] font-black text-zinc-500 uppercase tracking-widest px-2 mb-2">
-                Arquivos do Projeto
-              </div>
-
-              {/* Root folder app */}
-              <FolderNode name="app" path="app" />
-              {expandedFolders["app"] && (
-                <>
-                  <FolderNode name="src" path="app/src" />
-                  {expandedFolders["app/src"] && (
-                    <>
-                      <FolderNode name="main" path="app/src/main" />
-                      {expandedFolders["app/src/main"] && (
-                        <>
-                          <FolderNode name="java (Kotlin)" path="app/src/main/java" childrenCount={4} />
-                          {expandedFolders["app/src/main/java"] && (
-                            <div className="flex flex-col gap-0.5 mb-1.5">
-                              {androidFiles.filter(f => f.name.endsWith('.kt')).map((file) => (
-                                <div
-                                  key={file.name}
-                                  onClick={() => setSelectedFile(file)}
-                                  className={`flex items-center gap-1.5 py-1.5 px-3 ml-7 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-400 font-mono text-[11px] transition ${
-                                    selectedFile.name === file.name ? "bg-zinc-900 font-bold text-amber-400 border-l-2 border-amber-500 pl-2" : ""
-                                  }`}
-                                >
-                                  <FileCode size={12} className="text-orange-400" />
-                                  <span className="truncate">{file.name}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          <FolderNode name="res (Styles/Layout)" path="app/src/main/res" childrenCount={4} />
-                          {expandedFolders["app/src/main/res"] && (
-                            <>
-                              <FolderNode name="layout" path="app/src/main/res/layout" />
-                              {expandedFolders["app/src/main/res/layout"] && (
-                                <div className="flex flex-col gap-0.5 mb-1.5">
-                                  {androidFiles.filter(f => f.path.includes('/layout/')).map((file) => (
-                                    <div
-                                      key={file.name}
-                                      onClick={() => setSelectedFile(file)}
-                                      className={`flex items-center gap-1.5 py-1.5 px-3 ml-7 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-400 font-mono text-[11px] transition ${
-                                        selectedFile.name === file.name ? "bg-zinc-900 font-bold text-amber-400 border-l-2 border-amber-500 pl-2" : ""
-                                      }`}
-                                    >
-                                      <FileCode size={12} className="text-amber-500" />
-                                      <span className="truncate">{file.name}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              <FolderNode name="xml (Config)" path="app/src/main/res/xml" />
-                              {expandedFolders["app/src/main/res/xml"] && (
-                                <div className="flex flex-col gap-0.5 mb-1.5">
-                                  {androidFiles.filter(f => f.path.includes('/xml/')).map((file) => (
-                                    <div
-                                      key={file.name}
-                                      onClick={() => setSelectedFile(file)}
-                                      className={`flex items-center gap-1.5 py-1.5 px-3 ml-7 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-400 font-mono text-[11px] transition ${
-                                        selectedFile.name === file.name ? "bg-zinc-900 font-bold text-amber-400 border-l-2 border-amber-500 pl-2" : ""
-                                      }`}
-                                    >
-                                      <FileCode size={12} className="text-amber-500" />
-                                      <span className="truncate">{file.name}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              <FolderNode name="values" path="app/src/main/res/values" />
-                              {expandedFolders["app/src/main/res/values"] && (
-                                <div className="flex flex-col gap-0.5 mb-1.5">
-                                  {androidFiles.filter(f => f.path.includes('/values/')).map((file) => (
-                                    <div
-                                      key={file.name}
-                                      onClick={() => setSelectedFile(file)}
-                                      className={`flex items-center gap-1.5 py-1.5 px-3 ml-7 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-400 font-mono text-[11px] transition ${
-                                        selectedFile.name === file.name ? "bg-zinc-900 font-bold text-amber-400 border-l-2 border-amber-500 pl-2" : ""
-                                      }`}
-                                    >
-                                      <FileCode size={12} className="text-pink-400" />
-                                      <span className="truncate">{file.name}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          )}
-                          
-                          {/* Manifest extra */}
-                          <div
-                            onClick={() => setSelectedFile(androidFiles.find(f => f.name === "AndroidManifest.xml")!)}
-                            className={`flex items-center gap-1.5 py-1.5 px-2.5 ml-3 hover:bg-zinc-900 rounded-xl cursor-pointer text-zinc-300 font-sans text-xs transition ${
-                              selectedFile.name === "AndroidManifest.xml" ? "bg-zinc-900 font-bold text-amber-400 border-l-2 border-amber-500 pl-2" : ""
-                            }`}
-                          >
-                            <FileCode size={13} className="text-purple-400" />
-                            <span>AndroidManifest.xml</span>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-
+          {/* Interactive tactile smartphone frame */}
+          <div 
+            className={`relative w-full max-w-[340px] h-[590px] bg-slate-950 rounded-[44px] border-[10px] border-slate-900 shadow-2xl overflow-hidden transition-transform duration-100 ${
+              isShaking ? "animate-vibrate scale-[0.985] bg-amber-500/10" : ""
+            }`}
+          >
+            {/* Speaker & notch */}
+            <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-4.5 bg-slate-900 rounded-full z-45 flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-slate-950 border border-slate-800" />
+              <div className="w-8 h-1 bg-slate-800 rounded mx-3" />
             </div>
 
-            {/* Code Editor and Detail Body */}
-            <div className="flex-1 flex flex-col bg-zinc-950 overflow-hidden">
+            {/* Simulated Android Status bar */}
+            <div className="h-8 px-6 pt-2 bg-slate-950 text-slate-500 text-[9px] font-mono flex justify-between items-center z-30 select-none border-b border-slate-900/60">
+              <span className="font-bold">12:30</span>
+              <div className="flex items-center gap-1.5">
+                <Vibrate size={11} className={vibrateEnabled ? "text-amber-400" : "text-slate-700"} />
+                <span className="text-[8px] font-extrabold text-slate-400">99 OK</span>
+                <span className="border border-slate-800 rounded px-1 py-0.2 text-[7.5px] text-slate-400">92%</span>
+              </div>
+            </div>
+
+            {/* Smartphone core viewport screen */}
+            <div className="relative h-[calc(100%-32px-56px)] bg-slate-950 text-slate-200 overflow-y-auto p-4 flex flex-col scrollbar-thin">
               
-              {/* Arquivo Ativo Detail */}
-              <div className="p-4 bg-zinc-900/40 border-b border-zinc-850 shrink-0">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/25">
-                    {selectedFile.path}
-                  </span>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase">
-                    {selectedFile.language.toUpperCase()}
-                  </span>
-                </div>
-                <p className="text-xs text-zinc-400 mt-2.5 leading-relaxed">
-                  {selectedFile.description}
-                </p>
-              </div>
+              <AnimatePresence mode="wait">
+                
+                {/* 1. ANALISI CALCULATION TAB SCREEN */}
+                {activeTab === "analisar" && (
+                  <motion.div
+                    key="analisar"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="flex flex-col gap-4 flex-grow"
+                  >
+                    {/* Header in smartphone */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-900">
+                      <div>
+                        <h3 className="font-extrabold text-xs text-white">99 Copilot Assistant</h3>
+                        <p className="text-[7.5px] text-slate-500 font-mono">Simulador de Ofertas de Corrida</p>
+                      </div>
+                      <span className="text-[8.5px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-black">
+                        MONITORANDO
+                      </span>
+                    </div>
 
-              {/* Code Container view */}
-              <div className="flex-1 overflow-auto p-4 bg-zinc-950/80 font-mono line-clamp-none select-text">
-                <div className="table min-w-full">
-                  {renderCodeSnippet(selectedFile.content)}
-                </div>
-              </div>
+                    {/* Predefined ML Kit OCR click triggers */}
+                    <div className="flex flex-col gap-2 bg-slate-900/30 border border-slate-900 p-2.5 rounded-xl">
+                      <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                        📸 Simular detecção OCR (ML Kit Local):
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          onClick={() => triggerSimulatedOcr("vip")}
+                          className={`px-1 py-2 rounded-lg text-[8.5px] font-extrabold border transition-all cursor-pointer ${
+                            activeSimulatedTemplate === "vip" 
+                              ? "bg-emerald-500/20 border-emerald-400 text-emerald-300"
+                              : "bg-slate-900 border-slate-850 hover:bg-slate-800 text-slate-300"
+                          }`}
+                        >
+                          🔥 R$ 68,00 VIP
+                        </button>
+                        <button
+                          onClick={() => triggerSimulatedOcr("medium")}
+                          className={`px-1 py-2 rounded-lg text-[8.5px] font-extrabold border transition-all cursor-pointer ${
+                            activeSimulatedTemplate === "medium" 
+                              ? "bg-amber-500/20 border-amber-400 text-amber-300"
+                              : "bg-slate-900 border-slate-850 hover:bg-slate-800 text-slate-300"
+                          }`}
+                        >
+                          🚗 R$ 22,50 OK
+                        </button>
+                        <button
+                          onClick={() => triggerSimulatedOcr("ruim")}
+                          className={`px-1 py-2 rounded-lg text-[8.5px] font-extrabold border transition-all cursor-pointer ${
+                            activeSimulatedTemplate === "ruim" 
+                              ? "bg-red-500/20 border-red-400 text-rose-300"
+                              : "bg-slate-900 border-slate-850 hover:bg-slate-800 text-slate-300"
+                          }`}
+                        >
+                          ⚠️ R$ 13,40 Ruim
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* OCR active simulated scanner status */}
+                    {ocrStatus === "reading" && (
+                      <div className="bg-amber-400/10 border border-amber-450/20 rounded-xl p-3 text-center flex flex-col gap-1 items-center justify-center">
+                        <span className="w-4 h-4 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                        <span className="text-[9.5px] font-bold text-amber-300 uppercase tracking-widest mt-1">Lendo tela com ML Kit...</span>
+                      </div>
+                    )}
+
+                    {/* Display card results dashboard */}
+                    {canAnalyzeComp && ocrStatus !== "reading" ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`rounded-2xl p-3.5 border text-center relative overflow-hidden ${
+                          calculatedScore >= 75
+                            ? "bg-emerald-950/30 border-emerald-500/50 shadow-md shadow-emerald-500/5"
+                            : calculatedScore >= 50
+                            ? "bg-amber-950/30 border-amber-500/50 shadow-md shadow-amber-500/5"
+                            : "bg-red-950/30 border-red-500/50 shadow-md shadow-red-500/5"
+                        }`}
+                      >
+                        {/* Rating Star Badge */}
+                        <div className="flex items-center justify-center gap-1 animate-pulse">
+                          <span className="text-xl">{calculatedScore >= 75 ? "🟢" : calculatedScore >= 50 ? "🟡" : "🔴"}</span>
+                          <span className="text-xs font-black text-slate-300">{activeFeedback.stars}</span>
+                        </div>
+                        <h4 className={`text-sm font-black tracking-tight mt-1 uppercase ${
+                          calculatedScore >= 75 ? "text-emerald-400" : calculatedScore >= 50 ? "text-amber-400" : "text-rose-400"
+                        }`}>
+                          Nota {calculatedScore}/100 • {calculatedScore >= 75 ? "EXCELENTE" : calculatedScore >= 50 ? "MÉDIA" : "PREJUÍZO!"}
+                        </h4>
+
+                        <p className="text-[9.5px] text-slate-350 italic mt-0.5 font-medium leading-normal">
+                          &ldquo;{activeFeedback.feedback}&rdquo;
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2 mt-3 text-left">
+                          <div className="bg-black/40 border border-slate-900 rounded-xl p-2 flex flex-col">
+                            <span className="text-[7.5px] font-bold text-slate-500 uppercase">Faturamento por Km</span>
+                            <span className="text-xs font-black text-slate-100 mt-0.5">R$ {rPerKm.toFixed(2)}/km</span>
+                          </div>
+                          <div className="bg-black/40 border border-slate-900 rounded-xl p-2 flex flex-col">
+                            <span className="text-[7.5px] font-bold text-slate-500 uppercase">Lucro Líquido Real</span>
+                            <span className="text-xs font-black text-emerald-450 mt-0.5">R$ {netProfit.toFixed(2)}</span>
+                          </div>
+                          <div className="bg-black/40 border border-slate-900 rounded-xl p-2 flex flex-col col-span-2 text-center">
+                            <span className="text-[7.5px] font-bold text-slate-500 uppercase block">Gasto Estimado de Combustível</span>
+                            <span className="text-xs font-black text-slate-200 mt-0.5">R$ {fuelCost.toFixed(2)} (<span className="text-amber-400 font-bold">{(distNum + searchDistNum).toFixed(1)}km</span> totais)</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      ocrStatus !== "reading" && (
+                        <div className="bg-slate-900/40 border border-slate-900/70 p-5 rounded-2xl text-center text-slate-500 flex flex-col gap-2 items-center justify-center">
+                          <span className="text-2xl opacity-40">🚦</span>
+                          <p className="text-[10px] font-medium leading-normal">
+                            O semáforo flutuante avalia automaticamente preenchendo os dados abaixo!
+                          </p>
+                        </div>
+                      )
+                    )}
+
+                    {/* Numeric analysis dashboard fields */}
+                    <div className="bg-slate-900/60 border border-slate-900 p-3.5 rounded-2xl flex flex-col gap-2.5">
+                      
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <DollarSign size={9} className="text-amber-400" />
+                            Valor (R$)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={inputValor}
+                            onChange={(e) => setInputValor(e.target.value)}
+                            placeholder="Ex: 25,00"
+                            className="bg-slate-950 border border-slate-850 px-2.5 py-2 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <MapPin size={9} className="text-amber-400" />
+                            Corrida (km)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={inputDistance}
+                            onChange={(e) => setInputDistance(e.target.value)}
+                            placeholder="Ex: 8.5"
+                            className="bg-slate-950 border border-slate-850 px-2.5 py-2 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <Clock size={9} className="text-amber-400" />
+                            Tempo (min)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={inputTime}
+                            onChange={(e) => setInputTime(e.target.value)}
+                            placeholder="Ex: 20"
+                            className="bg-slate-950 border border-slate-850 px-2.5 py-2 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                            <Plus size={10} className="text-amber-400" />
+                            Busca (km)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={inputSearchDistance}
+                            onChange={(e) => setInputSearchDistance(e.target.value)}
+                            placeholder="Ex: 1,5"
+                            className="bg-slate-950 border border-slate-850 px-2.5 py-2 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider block">
+                          Bairro / Região Do Destino:
+                        </label>
+                        <input
+                          type="text"
+                          value={inputRegion}
+                          onChange={(e) => setInputRegion(e.target.value)}
+                          placeholder="Ex: Pinheiros"
+                          className="bg-slate-950 border border-slate-850 px-2.5 py-2 rounded-xl text-xs font-extrabold text-white focus:outline-none focus:border-amber-450"
+                        />
+                      </div>
+
+                      {/* Interactive save CTA button */}
+                      <button
+                        onClick={handleAnalyzeAndSave}
+                        className="w-full bg-amber-450 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase py-2.5 rounded-xl mt-1 tracking-wider transition-all hover:scale-101 active:scale-99 cursor-pointer shadow-md"
+                      >
+                        SIMULAR MONITORAMENTO 🚦
+                      </button>
+
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 2. STATS & ANALYTICAL DASHBOARD TAB SCREEN */}
+                {activeTab === "dashboard" && (
+                  <motion.div
+                    key="dashboard"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="flex flex-col gap-3.5 flex-grow"
+                  >
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-900">
+                      <div>
+                        <h3 className="font-extrabold text-xs text-white">Painel Operacional</h3>
+                        <p className="text-[7.5px] text-slate-500 font-mono">SQLite Room Database Histórico</p>
+                      </div>
+                      <span className="text-[8px] bg-amber-400/10 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-400/20">
+                        HOJE
+                      </span>
+                    </div>
+
+                    {/* Numeric aggregator metrics tiles */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-slate-900/50 border border-slate-900 p-2.5 rounded-xl flex flex-col gap-0.5">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase">Lucro Líquido Real</span>
+                        <span className="text-sm font-black text-emerald-450 font-mono">R$ {totalNetGains.toFixed(2)}</span>
+                        <span className="text-[7px] text-slate-450">Descontados Combustíveis</span>
+                      </div>
+
+                      <div className="bg-slate-900/50 border border-slate-900 p-2.5 rounded-xl flex flex-col gap-0.5">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase">Ganho Médio / Km</span>
+                        <span className="text-sm font-black text-slate-100 font-mono">R$ {avgKmGainRate.toFixed(2)}/km</span>
+                        <span className="text-[7px] text-slate-450 font-medium">Meta ideal: R$ {minGood.toFixed(2)}</span>
+                      </div>
+
+                      <div className="bg-slate-900/50 border border-slate-900 p-2.5 rounded-xl flex flex-col gap-0.5">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase">Taxa de Aceitação</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-sm font-black font-mono ${
+                            currentAcceptanceRateCalculated >= desiredAcceptRate ? "text-emerald-400" : "text-amber-400"
+                          }`}>{currentAcceptanceRateCalculated}%</span>
+                          <span className="text-[7.5px] text-slate-400 mt-0.5">Meta: {desiredAcceptRate}%</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/50 border border-slate-900 p-2.5 rounded-xl flex flex-col gap-0.5 select-none">
+                        <span className="text-[8px] font-bold text-slate-500 uppercase">Melhor Região/Bairro</span>
+                        <span className="text-xs font-black text-amber-300 truncate mt-0.5">{bestRegionCalculated}</span>
+                        <span className="text-[7px] text-slate-450">Maior rentabilidade líquida</span>
+                      </div>
+                    </div>
+
+                    {/* Simple Custom SVG Revenue progression chart */}
+                    <div className="bg-slate-900/30 border border-slate-900 rounded-xl p-3 flex flex-col gap-2">
+                      <span className="text-[8px] font-extrabold text-slate-450 uppercase tracking-widest block">
+                        Rendimento Líquido Diário Estimado (R$):
+                      </span>
+                      
+                      <div className="h-20 flex items-end justify-between px-1.5 pt-4 gap-2.5">
+                        <div className="flex flex-col items-center flex-1 gap-1 h-full justify-end">
+                          <div className="w-full bg-slate-800 rounded-md h-[25%] transition-all" />
+                          <span className="text-[7.5px] font-bold text-slate-500 font-mono leading-none">SEG</span>
+                        </div>
+                        <div className="flex flex-col items-center flex-1 gap-1 h-full justify-end">
+                          <div className="w-full bg-slate-800 rounded-md h-[40%] transition-all" />
+                          <span className="text-[7.5px] font-bold text-slate-500 font-mono leading-none">TER</span>
+                        </div>
+                        <div className="flex flex-col items-center flex-1 gap-1 h-full justify-end">
+                          <div className="w-full bg-slate-800 rounded-md h-[50%] transition-all" />
+                          <span className="text-[7.5px] font-bold text-slate-500 font-mono leading-none">QUA</span>
+                        </div>
+                        <div className="flex flex-col items-center flex-1 gap-1 h-full justify-end">
+                          <div className="w-full bg-slate-800 rounded-md h-[75%] transition-all" />
+                          <span className="text-[7.5px] font-bold text-slate-500 font-mono leading-none">QUI</span>
+                        </div>
+                        <div className="flex flex-col items-center flex-1 gap-1 h-full justify-end">
+                          <div className="w-full bg-amber-400 rounded-md h-[95%] transition-all shadow shadow-amber-400/10 animate-pulse" />
+                          <span className="text-[7.5px] font-extrabold text-amber-300 font-mono leading-none">HOJE</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Operational report feedback */}
+                    <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-900 flex items-start gap-2 text-slate-350">
+                      <TrendingUp size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                      <p className="text-[9px] leading-relaxed">
+                        Seu ganho médio por Km de <strong className="text-white">R$ {avgKmGainRate.toFixed(2)}/km</strong> é {avgKmGainRate >= minGood ? "superior" : "inferior"} à meta green configurada. Ao utilizar o Copilot, a lucratividade mensal estimada aumenta em até <strong className="text-emerald-400 font-bold">28%</strong> reduzindo desgaste mecânico desnecessário!
+                      </p>
+                    </div>
+
+                  </motion.div>
+                )}
+
+                {/* 3. DETAILED LOCAL HISTÓRICO TAB WITH INTERACTIVE DECISION TOGGLE */}
+                {activeTab === "historico" && (
+                  <motion.div
+                    key="historico"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="flex flex-col gap-3 flex-grow"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-900">
+                      <div className="flex items-center gap-2">
+                        <History size={13} className="text-amber-450" />
+                        <h3 className="font-extrabold text-xs text-white">Histórico Room DB</h3>
+                      </div>
+                      
+                      {history.length > 0 && (
+                        <button
+                          onClick={handleClearHistory}
+                          className="text-[8.5px] text-rose-400 font-black flex items-center gap-1 hover:underline cursor-pointer bg-slate-900 px-2 py-1 rounded"
+                        >
+                          <Trash2 size={10} />
+                          Limpar Room
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="text-[8px] bg-amber-400/10 border border-amber-400/20 text-amber-300 p-2 rounded-lg font-semibold leading-relaxed">
+                      💡 <strong>Dica do Dashboard:</strong> Clique na ação (<strong>Aceitou/Recusou</strong>) das viagens abaixo para alterná-las e recalcular seu lucro real!
+                    </div>
+
+                    <div className="flex-grow overflow-y-auto max-h-[300px] flex flex-col gap-2.5 pr-0.5 scrollbar-thin">
+                      {history.length === 0 ? (
+                        <div className="text-center py-10 text-slate-600 flex flex-col gap-2 items-center justify-center">
+                          <span className="text-2xl opacity-40">⏳</span>
+                          <p className="text-[10px] font-medium leading-normal">
+                            Histórico do banco está vazio.<br />As simulações persistirão aqui!
+                          </p>
+                        </div>
+                      ) : (
+                        history.map((record) => (
+                          <div
+                            key={record.id}
+                            className="bg-slate-900/50 border border-slate-900 px-3 py-2.5 rounded-xl flex items-center justify-between gap-1.5"
+                          >
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-black text-white leading-none">
+                                  R$ {record.val.toFixed(2)}
+                                </span>
+                                <span className="text-[8px] font-mono font-extrabold text-amber-450 bg-amber-450/5 border border-amber-450/15 px-1 rounded">
+                                  Score {record.score}
+                                </span>
+                              </div>
+                              <span className="text-[8px] text-slate-500 font-medium truncate">
+                                {record.dist}km (+{record.searchDistance}km busca) • {record.region}
+                              </span>
+                              <span className="text-[8.5px] text-slate-350 leading-none mt-1">
+                                R$ {record.rPerKm.toFixed(2)}/km • Lucro líq:{" "}
+                                <strong className="text-emerald-400 font-mono">
+                                  R$ {record.netProfit.toFixed(2)}
+                                </strong>
+                              </span>
+                            </div>
+
+                            {/* Toggables interactive driver action buttons */}
+                            <button
+                              onClick={() => toggleRideAccepted(record.id)}
+                              className={`text-[8.5px] font-black px-2 py-2 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                                record.isAccepted
+                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                                  : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                              }`}
+                            >
+                              {record.isAccepted ? "ACEITOU" : "RECUSOU"}
+                            </button>
+
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 4. ADVANCED USER PREFERENCES CONFIG SCREEN */}
+                {activeTab === "ajustes" && (
+                  <motion.div
+                    key="ajustes"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="flex flex-col gap-4 flex-grow"
+                  >
+                    <div className="flex items-center pb-2 border-b border-slate-900 gap-2">
+                      <Sliders size={13} className="text-amber-450" />
+                      <h3 className="font-extrabold text-xs text-white">Objetivos Operacionais</h3>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      
+                      {/* Vehicle km/l rating config */}
+                      <div className="flex flex-col gap-1 inline-block">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                          Consumo do Carro (km/L):
+                        </label>
+                        <input
+                          type="number"
+                          value={kmPerLitre}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 1.0;
+                            setKmPerLitre(val);
+                            localStorage.setItem("copilot_km_per_litre", val.toString());
+                          }}
+                          className="bg-slate-950 border border-slate-850 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                        />
+                      </div>
+
+                      {/* Gas Price config */}
+                      <div className="flex flex-col gap-1 inline-block">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                          Preço do Combustível (R$/L):
+                        </label>
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={fuelPrice}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0.1;
+                            setFuelPrice(val);
+                            localStorage.setItem("copilot_fuel_price", val.toString());
+                          }}
+                          className="bg-slate-950 border border-slate-850 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-450 font-mono"
+                        />
+                      </div>
+
+                      {/* Minimum Threshold Km rate Good trigger */}
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <div className="flex justify-between items-center text-[9px] font-bold">
+                          <span className="text-slate-350">🟢 Meta Excelente / km</span>
+                          <span className="font-mono text-emerald-400 bg-emerald-500/5 px-1.5 rounded border border-emerald-500/10 py-0.2">
+                            R$ {minGood.toFixed(2)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1.2"
+                          max="4.0"
+                          step="0.10"
+                          value={minGood}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (val >= minMedium) {
+                              setMinGood(val);
+                              localStorage.setItem("copilot_km_good", val.toString());
+                            } else {
+                              triggerToast("⚠️", "A meta excelente deve ser igual ou superior à aceitável.");
+                            }
+                          }}
+                          className="w-full accent-amber-450 h-1 rounded"
+                        />
+                      </div>
+
+                      {/* Minimum Threshold Km rate Medium range */}
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <div className="flex justify-between items-center text-[9px] font-bold">
+                          <span className="text-slate-350">🟡 Meta Aceitável / km</span>
+                          <span className="font-mono text-amber-300 bg-amber-500/5 px-1.5 rounded border border-amber-500/10 py-0.2">
+                            R$ {minMedium.toFixed(2)}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.8"
+                          max="3.0"
+                          step="0.10"
+                          value={minMedium}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (val <= minGood) {
+                              setMinMedium(val);
+                              localStorage.setItem("copilot_km_medium", val.toString());
+                            } else {
+                              triggerToast("⚠️", "A meta aceitável deve ser menor ou igual à excelente.");
+                            }
+                          }}
+                          className="w-full accent-amber-450 h-1 rounded"
+                        />
+                      </div>
+
+                      {/* Hour rate config target */}
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <div className="flex justify-between items-center text-[9px] font-bold">
+                          <span className="text-slate-350">⏱️ Faturamento Alvo / Hora</span>
+                          <span className="font-mono text-amber-300 bg-amber-500/5 px-1.5 rounded border border-amber-500/10 py-0.2">
+                            R$ {minHour.toFixed(1)}/h
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="100"
+                          step="5"
+                          value={minHour}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setMinHour(val);
+                            localStorage.setItem("copilot_hour", val.toString());
+                          }}
+                          className="w-full accent-amber-450 h-1 rounded"
+                        />
+                      </div>
+
+                      {/* Desired Acceptance Rate config slider */}
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <div className="flex justify-between items-center text-[9px] font-bold">
+                          <span className="text-slate-350">📈 Meta de Aceitação desejada</span>
+                          <span className="font-mono text-amber-300 bg-amber-500/5 px-1.5 rounded border border-amber-500/10 py-0.2">
+                            {desiredAcceptRate}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="45"
+                          max="95"
+                          step="5"
+                          value={desiredAcceptRate}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setDesiredAcceptRate(val);
+                            localStorage.setItem("copilot_accept_rate", val.toString());
+                          }}
+                          className="w-full accent-amber-450 h-1 rounded"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between bg-slate-900/40 p-2 rounded-xl mt-1 text-[9.5px]">
+                        <div>
+                          <strong>Vibrar na análise</strong>
+                          <p className="text-[7.5px] text-slate-500">Feedback físico no celular</p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
+                          <input 
+                            type="checkbox" 
+                            checked={vibrateEnabled}
+                            onChange={() => {
+                              setVibrateEnabled(!vibrateEnabled);
+                              localStorage.setItem("copilot_vibrate", (!vibrateEnabled).toString());
+                              if (!vibrateEnabled && navigator.vibrate) {
+                                navigator.vibrate(100);
+                              }
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-8 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-400 peer-checked:after:bg-slate-950"></div>
+                        </label>
+                      </div>
+
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 5. APP DEPLOY & STANDALONE FILE INFO SCREEN */}
+                {activeTab === "codigo" && (
+                  <motion.div
+                    key="codigo"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.12 }}
+                    className="flex flex-col gap-3 flex-grow text-slate-300 text-[10px]"
+                  >
+                    <div className="flex items-center pb-2 border-b border-slate-900 gap-2">
+                      <HelpCircle size={14} className="text-amber-450" />
+                      <h3 className="font-extrabold text-xs text-white">Empacotar para Celular</h3>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5 leading-relaxed overflow-y-auto max-h-[350px]">
+                      <p>
+                        O 99 Copilot foi projetado para rodar offline e ocupar pouca bateria com o motorista dirigindo:
+                      </p>
+                      
+                      <ol className="list-decimal pl-4 flex flex-col gap-2.5 text-slate-400">
+                        <li>
+                          Baixe o arquivo standalone clicando em <strong>BAIXAR INDEX.HTML</strong> no tutorial do painel lateral.
+                        </li>
+                        <li>
+                          Instale no celular qualquer compilador Web-to-APK (como WebToAPK do Android).
+                        </li>
+                        <li>
+                          Importe o index.html, digite "99 Copilot" de nome e gere seu APK instalável sem custos!
+                        </li>
+                      </ol>
+
+                      <div className="mt-3 bg-amber-400/5 border border-amber-400/20 p-2.5 rounded-xl text-amber-300 flex gap-2">
+                        <Info size={13} className="shrink-0 mt-0.5 animate-pulse" />
+                        <div>
+                          <strong>Compilado Localizado:</strong> O dashboard nativo em Kotlin também pode ser sincronizado editando os arquivos expostos ao lado!
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+              </AnimatePresence>
 
             </div>
+
+            {/* Bottom Smartphone Live Tab navigation */}
+            <nav className="absolute bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-900 py-2.5 px-2 flex justify-around select-none border-b rounded-b-[44px]">
+              <button
+                onClick={() => setActiveTab("analisar")}
+                className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+                  activeTab === "analisar" ? "text-amber-450 scale-[1.03]" : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                <Smartphone size={13} />
+                <span className="text-[7.5px] font-black uppercase tracking-wider">Cálculo</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+                  activeTab === "dashboard" ? "text-amber-450 scale-[1.03]" : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                <Percent size={13} />
+                <span className="text-[7.5px] font-black uppercase tracking-wider">Painel</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("historico")}
+                className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+                  activeTab === "historico" ? "text-amber-450 scale-[1.03]" : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                <History size={13} />
+                <span className="text-[7.5px] font-black uppercase tracking-wider">History</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("ajustes")}
+                className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+                  activeTab === "ajustes" ? "text-amber-450 scale-[1.03]" : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                <Sliders size={13} />
+                <span className="text-[7.5px] font-black uppercase tracking-wider">Metas</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("codigo")}
+                className={`flex flex-col items-center gap-0.5 transition cursor-pointer ${
+                  activeTab === "codigo" ? "text-amber-450 scale-[1.03]" : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                <HelpCircle size={13} />
+                <span className="text-[7.5px] font-black uppercase tracking-wider">Como Usar</span>
+              </button>
+            </nav>
 
           </div>
 
@@ -1472,54 +1393,20 @@ export default function App() {
 
       </main>
 
-      {/* GUIA DE INSTRUÇÕES E EXPLICATIÇÃO DETALHADA */}
-      <section id="instructions" className="bg-zinc-900/30 border-t border-zinc-900 px-6 py-10">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-          
-          <div className="bg-zinc-900/60 p-6 rounded-3xl border border-zinc-850">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">⚡</span>
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider">Como Importar para o Android</h3>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Crie um novo projeto no Android Studio com o template <strong>"Empty Views Activity"</strong> (usando Kotlin). Defina o pacote padrão como <code>com.gigu.clone99</code>. Copie todos os arquivos listados no Code Explorer do painel direito seguindo rigorosamente as pastas e arquivos estabelecidos.
-            </p>
-          </div>
+      {/* Toast Alert module inside App interface overlay layer */}
+      <div 
+        className={`fixed z-50 bottom-24 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-800 backdrop-blur-md py-2.5 px-5 rounded-full shadow-2xl flex items-center gap-2 pointer-events-none transition-all duration-300 ${
+          toast.show ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+        }`}
+      >
+        <span className="text-base leading-none">{toast.icon}</span>
+        <span className="text-xs font-black text-white">{toast.message}</span>
+      </div>
 
-          <div className="bg-zinc-900/60 p-6 rounded-3xl border border-zinc-850">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">⚙️</span>
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider">Lógica de Cálculo do Semáforo</h3>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              O aplicativo extrai o valor líquido da corrida, remove símbolos (R$) e computa as métricas de faturamento em tempo real: <br />
-              <strong className="text-white">R$/km</strong> = Valor / Distância. <br />
-              <strong className="text-white">R$/hora</strong> = Valor / (Tempo em min / 60). <br />
-              Se as metas de Km E Horas forem simultaneamente compridas, a corrida é classificada como excelente (🟢 Verde).
-            </p>
-          </div>
-
-          <div className="bg-zinc-900/60 p-6 rounded-3xl border border-zinc-850">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">🚨</span>
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider">Políticas e Bloqueio</h3>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Este aplicativo <strong>não possui rotina de auto-cliques nem aceita viagens sozinho</strong>. O serviço de acessibilidade opera estritamente no modo de leitura (Read-Only) passiva da tela. Isso respeita estritamente os termos de segurança da plataforma da 99, evitando quaisquer riscos de banimentos.
-            </p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="bg-zinc-950 border-t border-zinc-900 py-6 text-center text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p>© 2026 99 GigU Clone - Desenvolvido com carinho para motoristas autônomos.</p>
-          <div className="flex items-center gap-4">
-            <span className="text-[11px] text-zinc-600 font-mono">Status: Compilando Perfeitamente 🟢</span>
-          </div>
-        </div>
+      {/* Footer System Branding & Release labels */}
+      <footer className="border-t border-slate-900 py-6 text-center text-slate-500 text-[10px] select-none uppercase tracking-wide">
+        <p>© 2026 99 Copilot Assistant • Design Responsivo & Sincronização Room Database</p>
+        <p className="mt-1">Nativo Android Kotlin (MVVM) • Todos os Termos de Uso Protegidos</p>
       </footer>
 
     </div>

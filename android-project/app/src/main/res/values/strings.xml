@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">99 Ride Analyzer (GigU Clone)</string>
-    <string name="accessibility_service_label">99 Ride Analyzer - Assistente de Ganhos</string>
+    <string name="app_name">99 Copilot</string>
+    <string name="accessibility_service_label">99 Copilot - Assistente Inteligente</string>
     <string name="accessibility_service_desc">Lê automaticamente as informações de corridas da tela do app da 99 para calcular o ganho por km e por hora em tempo real, sem automação de cliques.</string>
     
     <!-- Main Activity -->
